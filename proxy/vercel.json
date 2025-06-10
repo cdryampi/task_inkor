@@ -48,11 +48,11 @@
                 },
                 {
                     "key": "Access-Control-Allow-Methods",
-                    "value": "GET, POST, PUT, DELETE, OPTIONS"
+                    "value": "GET, POST, PUT, DELETE, PATCH, OPTIONS"
                 },
                 {
                     "key": "Access-Control-Allow-Headers",
-                    "value": "Content-Type, Authorization, X-Requested-With"
+                    "value": "Content-Type, Authorization, X-Requested-With, apikey, prefer, x-client-info"
                 }
             ]
         }

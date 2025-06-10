@@ -2,23 +2,43 @@ export default async function handler(req, res) {
   // Configurar CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, apikey, X-Client-Info');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, apikey, X-Client-Info, prefer');
 
   // Manejar preflight OPTIONS
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    return res.status(200).end();
   }
 
   try {
+    // Validar variables de entorno
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+      console.error('❌ Missing Supabase credentials');
+      return res.status(500).json({
+        error: 'Configuration error',
+        message: 'Supabase credentials not configured'
+      });
+    }
+
     // Obtener el path desde query params
     const targetPath = req.query.path || '';
 
-    // Limpiar el path
-    const cleanPath = targetPath.startsWith('/') ? targetPath : `/${targetPath}`;
+    // Validar que hay un path
+    if (!targetPath) {
+      return res.status(400).json({
+        error: 'Bad request',
+        message: 'Path parameter is required'
+      });
+    }
+
+    // Limpiar el path - asegurarse de que comience con /rest/v1/
+    let cleanPath = targetPath;
+    if (!cleanPath.startsWith('/rest/v1/')) {
+      cleanPath = `/rest/v1/${cleanPath.replace(/^\/+/, '')}`;
+    }
 
     // Construir la URL completa de Supabase
-    const supabaseUrl = `${process.env.SUPABASE_URL}${cleanPath}`;
+    const baseUrl = process.env.SUPABASE_URL.replace(/\/$/, ''); // Remove trailing slash
+    const supabaseUrl = `${baseUrl}${cleanPath}`;
 
     // Construir query string si hay parámetros adicionales
     const queryParams = new URLSearchParams();
@@ -34,29 +54,34 @@ export default async function handler(req, res) {
 
     console.log(`[PROXY] ${req.method} ${finalUrl}`);
 
-    // Preparar headers
+    // Preparar headers - USAR SUPABASE_ANON_KEY, no SUPABASE_API_KEY
     const headers = {
       'Content-Type': 'application/json',
-      'apikey': process.env.SUPABASE_API_KEY,
-      'Prefer': 'return=representation'
+      'apikey': process.env.SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`
     };
 
-    // Agregar Authorization si está presente
-    if (req.headers.authorization) {
+    // Agregar prefer header si está presente
+    if (req.headers.prefer) {
+      headers['Prefer'] = req.headers.prefer;
+    } else {
+      headers['Prefer'] = 'return=representation';
+    }
+
+    // Sobrescribir Authorization si el cliente envía una diferente (usuario autenticado)
+    if (req.headers.authorization && req.headers.authorization !== `Bearer ${process.env.SUPABASE_ANON_KEY}`) {
       headers['Authorization'] = req.headers.authorization;
     }
 
     // Preparar el body para métodos que lo requieren
     let body = undefined;
-    if (!['GET', 'HEAD', 'DELETE'].includes(req.method)) {
-      if (req.body && typeof req.body === 'string') {
-        body = req.body;
-      } else if (req.body && typeof req.body === 'object') {
-        body = JSON.stringify(req.body);
+    if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+      if (req.body) {
+        body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
       }
     }
 
-    // Hacer la petición a Supabase (fetch es global en Node 18+)
+    // Hacer la petición a Supabase
     const response = await fetch(finalUrl, {
       method: req.method,
       headers: headers,
@@ -66,30 +91,33 @@ export default async function handler(req, res) {
     // Obtener la respuesta
     const responseText = await response.text();
 
-    // Log para debugging
     console.log(`[PROXY] Response: ${response.status}`);
 
-    // Enviar headers de respuesta
-    response.headers.forEach((value, key) => {
-      if (key.toLowerCase() !== 'content-encoding') {
-        res.setHeader(key, value);
-      }
-    });
+    // Configurar headers de respuesta
+    const contentType = response.headers.get('content-type');
+    if (contentType) {
+      res.setHeader('Content-Type', contentType);
+    }
 
-    // Enviar la respuesta
+    // Enviar la respuesta con el status code correcto
     res.status(response.status);
 
-    // Intentar parsear como JSON
-    try {
-      const jsonData = JSON.parse(responseText);
-      res.json(jsonData);
-    } catch {
-      res.send(responseText);
+    // Intentar parsear como JSON si es aplicable
+    if (contentType && contentType.includes('application/json')) {
+      try {
+        const jsonData = JSON.parse(responseText);
+        return res.json(jsonData);
+      } catch (parseError) {
+        console.warn('[PROXY] Failed to parse JSON response:', parseError);
+        return res.send(responseText);
+      }
+    } else {
+      return res.send(responseText);
     }
 
   } catch (error) {
     console.error('[PROXY] Error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       error: 'Proxy error',
       message: error.message,
       timestamp: new Date().toISOString()
