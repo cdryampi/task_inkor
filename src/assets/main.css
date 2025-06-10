@@ -1,0 +1,39 @@
+@import "tailwindcss";
+@plugin "flowbite/plugin";
+
+@theme {
+  --color-primary: #10b981; /* verde esmeralda energético */
+  --color-primary-50: #ecfdf5; /* menta fresca */
+  --color-primary-100: #d1fae5; /* verde suave motivador */
+  --color-primary-200: #a7f3d0; /* aliento de productividad */
+  --color-primary-300: #6ee7b7; /* checkbox completado */
+  --color-primary-400: #34d399; /* progreso visible */
+  --color-primary-500: #10b981; /* tono base: éxito en acción */
+  --color-primary-600: #059669; /* determinación verde */
+  --color-primary-700: #047857; /* enfoque profundo */
+  --color-primary-800: #065f46; /* estabilidad productiva */
+  --color-primary-900: #064e3b; /* fundación sólida */
+  --color-primary-950: #022c22; /* raíces de disciplina */
+
+  /* Colores complementarios alegres */
+  --color-success: #22c55e; /* verde lima celebración */
+  --color-warning: #f59e0b; /* naranja mandarina */
+  --color-error: #ef4444; /* rojo coral suave */
+  --color-info: #3b82f6; /* azul cielo optimista */
+
+  /* Tonos secundarios vibrantes */
+  --color-accent: #8b5cf6; /* púrpura creatividad */
+  --color-accent-light: #a78bfa; /* lavanda inspiración */
+
+  /* Grises cálidos y amigables */
+  --color-gray-50: #fafafa; /* blanco papel limpio */
+  --color-gray-100: #f5f5f5; /* fondo acogedor */
+  --color-gray-200: #e5e5e5; /* líneas suaves */
+  --color-gray-300: #d4d4d4; /* bordes amigables */
+  --color-gray-400: #a3a3a3; /* texto secundario */
+  --color-gray-500: #737373; /* equilibrio neutral */
+  --color-gray-600: #525252; /* texto principal */
+  --color-gray-700: #404040; /* contraste suave */
+  --color-gray-800: #262626; /* profundidad cálida */
+  --color-gray-900: #171717; /* máximo contraste */
+}
