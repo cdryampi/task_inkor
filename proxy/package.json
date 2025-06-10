@@ -1,0 +1,14 @@
+{
+  "name": "supabase-proxy",
+  "version": "1.0.0",
+  "description": "Proxy server for Supabase API - de InkorDB y las peticiones a OpenAI",
+  "main": "api/proxy.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "node api/proxy.js"
+  },
+  "dependencies": {},
+  "engines": {
+    "node": "18.x"
+  }
+}

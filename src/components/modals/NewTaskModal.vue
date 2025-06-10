@@ -28,9 +28,9 @@
               <div class="flex items-center justify-between mb-6">
                 <DialogTitle as="h3" class="text-xl font-bold text-primary-800 flex items-center space-x-3">
                   <div class="p-2 bg-primary-100 rounded-full">
-                    <PlusCircleIcon class="w-6 h-6 text-primary-600" />
+                    <component :is="isEditMode ? 'PencilSquareIcon' : 'PlusCircleIcon'" class="w-6 h-6 text-primary-600" />
                   </div>
-                  <span>{{ presetDate ? 'Programar Tarea' : 'Nueva Tarea' }}</span>
+                  <span>{{ getModalTitle }}</span>
                 </DialogTitle>
                 <button
                   @click="closeModal"
@@ -222,7 +222,7 @@
                     class="px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
                     <div v-if="loading" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                     <CheckIcon v-else class="w-4 h-4" />
-                    <span>{{ loading ? 'Creando...' : 'Crear Tarea' }}</span>
+                    <span>{{ getButtonText }}</span>
                   </button>
                 </div>
               </form>
@@ -270,11 +270,15 @@ const props = defineProps({
   presetDate: {
     type: Date,
     default: null
+  },
+  editTask: {
+    type: Object,
+    default: null
   }
 })
 
 // Emits
-const emit = defineEmits(['close', 'submit'])
+const emit = defineEmits(['close', 'submit', 'update'])
 
 // Form data
 const form = reactive({
@@ -291,6 +295,20 @@ const errors = reactive({
 })
 
 // Computed
+const isEditMode = computed(() => !!props.editTask)
+
+const getModalTitle = computed(() => {
+  if (isEditMode.value) return 'Editar Tarea'
+  return props.presetDate ? 'Programar Tarea' : 'Nueva Tarea'
+})
+
+const getButtonText = computed(() => {
+  if (props.loading) {
+    return isEditMode.value ? 'Actualizando...' : 'Creando...'
+  }
+  return isEditMode.value ? 'Actualizar Tarea' : 'Crear Tarea'
+})
+
 const formatPresetDate = computed(() => {
   if (!props.presetDate) return ''
   return new Intl.DateTimeFormat('es-ES', {
@@ -359,6 +377,16 @@ const resetForm = () => {
   errors.title = null
 }
 
+const populateForm = (task) => {
+  if (task) {
+    form.title = task.title || ''
+    form.description = task.description || ''
+    form.due_date = task.dueDate || task.due_date || ''
+    form.due_time = task.dueTime || task.due_time || ''
+    form.priority = task.priority || 'normal'
+  }
+}
+
 const validateForm = () => {
   errors.title = null
 
@@ -383,7 +411,12 @@ const handleSubmit = () => {
       title: form.title.trim(),
       description: form.description.trim() || null,
       priority: form.priority,
-      status: 'pending'
+      status: isEditMode.value ? props.editTask.status : 'pending'
+    }
+
+    // Si estamos editando, incluir el ID
+    if (isEditMode.value) {
+      taskData.id = props.editTask.id
     }
 
     // Manejar fecha
@@ -400,7 +433,13 @@ const handleSubmit = () => {
     }
 
     console.log('🚀 Enviando tarea:', taskData)
-    emit('submit', taskData)
+
+    // Emitir evento según el modo
+    if (isEditMode.value) {
+      emit('update', taskData)
+    } else {
+      emit('submit', taskData)
+    }
   }
 }
 
@@ -412,10 +451,16 @@ watch(() => props.isOpen, (newValue) => {
     }, 200)
   } else {
     errors.title = null
+    // Si hay una tarea para editar, poblar el formulario
+    if (props.editTask) {
+      populateForm(props.editTask)
+    }
   }
 })
 
-watch(() => form.due_time, (newValue) => {
-  console.log('⏰ Hora cambiada:', newValue)
+watch(() => props.editTask, (newTask) => {
+  if (newTask && props.isOpen) {
+    populateForm(newTask)
+  }
 })
 </script>

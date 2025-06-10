@@ -33,6 +33,12 @@ const router = createRouter({
       path: '/configuracion',
       name: 'configuracion',
       component: () => import('../views/ConfiguracionView.vue'),
+    },
+    {
+      path: '/task/:id',
+      name: 'task',
+      component: () => import('../views/TaskDetailView.vue'),
+      props: true,
     }
   ],
 })

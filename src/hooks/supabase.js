@@ -15,7 +15,7 @@ export const useSupabase = () => {
     try {
       // Probar primero con 'Task'
       let { error: taskError } = await supabase
-        .from('Task')
+        .from('task')
         .select('id')
         .limit(1)
 
@@ -353,6 +353,31 @@ export const useSupabase = () => {
     }
   }
 
+  // Obtener tarea por ID
+  const getTaskById = async (taskId) => {
+    try {
+      loading.value = true
+      console.log('🔍 Buscando tarea:', taskId)
+
+      const { data, error: fetchError } = await supabase
+        .from('task')
+        .select('*')
+        .eq('id', taskId)
+        .single()
+
+      if (fetchError) throw fetchError
+
+      console.log('✅ Tarea encontrada:', data)
+      return data
+    } catch (err) {
+      console.error('❌ Error obteniendo tarea:', err)
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     // Estado reactivo
     tasks,
@@ -370,6 +395,7 @@ export const useSupabase = () => {
     subscribeToTasks,
     testConnection,
     detectTableName,
+    getTaskById,
 
     // Cliente directo para casos especiales
     supabase

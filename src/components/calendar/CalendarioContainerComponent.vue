@@ -96,7 +96,7 @@
       </VCalendar>
     </div>
 
-    <!-- Panel lateral con tareas del día seleccionado MEJORADO -->
+    <!-- Panel lateral con TaskCards del día seleccionado -->
     <div v-if="selectedDate && !loading" class="mt-6 bg-white rounded-lg shadow-sm border border-gray-200">
       <div class="p-4 border-b border-gray-200 bg-gradient-to-r from-primary-50 to-primary-100">
         <h3 class="text-lg font-semibold text-primary-800 flex items-center justify-between">
@@ -126,100 +126,16 @@
       </div>
 
       <div class="p-4">
-        <!-- Tareas del día MEJORADAS -->
-        <div v-if="selectedDayTasks.length > 0" class="space-y-3">
-          <div
+        <!-- Usar TaskCard para las tareas del día -->
+        <div v-if="selectedDayTasks.length > 0" class="space-y-4">
+          <TaskCard
             v-for="task in selectedDayTasks"
             :key="task.id"
-            class="flex items-center justify-between p-4 rounded-lg border transition-all hover:shadow-md relative"
-            :class="task.status === 'completed' ?
-              'bg-green-50 border-green-200' :
-              'bg-gray-50 border-gray-200 hover:bg-gray-100'">
-
-            <!-- Borde lateral de prioridad -->
-            <div
-              class="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg"
-              :class="{
-                'bg-gradient-to-b from-red-500 to-red-600': task.priority === 'high',
-                'bg-gradient-to-b from-yellow-500 to-yellow-600': task.priority === 'medium',
-                'bg-gradient-to-b from-gray-400 to-gray-500': !task.priority || task.priority === 'normal'
-              }"></div>
-
-            <div class="flex items-center space-x-3">
-              <button
-                @click="toggleTaskStatus(task.id, task.status)"
-                class="flex-shrink-0 transition-colors">
-                <CheckCircleIcon
-                  :class="task.status === 'completed' ?
-                    'text-green-500 hover:text-green-600' :
-                    'text-gray-400 hover:text-primary-500'"
-                  class="w-6 h-6" />
-              </button>
-
-              <div class="flex-1">
-                <div class="flex items-center space-x-2 mb-1">
-                  <h4
-                    :class="task.status === 'completed' ?
-                      'line-through text-gray-500' :
-                      'text-gray-800'"
-                    class="font-medium">
-                    {{ task.title }}
-                  </h4>
-
-                  <!-- Ícono de prioridad grande y visible -->
-                  <div v-if="task.priority && task.priority !== 'normal'"
-                       class="flex items-center space-x-1"
-                       :class="{
-                         'animate-pulse': task.priority === 'high'
-                       }">
-                    <component
-                      :is="getPriorityIcon(task.priority)"
-                      class="w-4 h-4"
-                      :class="{
-                        'text-red-500': task.priority === 'high',
-                        'text-yellow-500': task.priority === 'medium'
-                      }" />
-                  </div>
-                </div>
-
-                <p v-if="task.description" class="text-sm text-gray-600 mt-1">
-                  {{ task.description }}
-                </p>
-
-                <div class="flex items-center space-x-2 mt-2">
-                  <!-- Badge de prioridad mejorado -->
-                  <div class="flex items-center space-x-1">
-                    <span class="text-xs px-2 py-1 rounded-full font-medium flex items-center space-x-1"
-                          :class="getPriorityClass(task.priority || 'normal')">
-                      <component
-                        :is="getPriorityIcon(task.priority || 'normal')"
-                        class="w-3 h-3" />
-                      <span>{{ getPriorityLabel(task.priority || 'normal') }}</span>
-                    </span>
-                  </div>
-
-                  <!-- Hora con mejor styling -->
-                  <span v-if="task.due_time" class="text-xs text-gray-500 flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded-full">
-                    <ClockIcon class="w-3 h-3" />
-                    <span class="font-medium">{{ formatTime(task.due_time) }}</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div class="flex space-x-2">
-              <button
-                @click="editTask(task)"
-                class="p-2 text-primary-500 hover:text-primary-600 hover:bg-primary-100 rounded transition-colors">
-                <PencilIcon class="w-4 h-4" />
-              </button>
-              <button
-                @click="confirmDeleteTask(task)"
-                class="p-2 text-red-500 hover:text-red-600 hover:bg-red-100 rounded transition-colors">
-                <TrashIcon class="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+            :task="formatTaskForCard(task)"
+            @edit-task="handleEditTask"
+            @delete-task="handleDeleteTask"
+            @update-status="handleUpdateStatus"
+          />
         </div>
 
         <!-- Empty state -->
@@ -287,13 +203,15 @@
       </div>
     </div>
 
-    <!-- Modal de nueva tarea -->
+    <!-- Modal de nueva/editar tarea -->
     <NewTaskModal
       :isOpen="isModalOpen"
       :loading="creatingTask"
       :presetDate="selectedDateForTask"
-      @close="closeModal"
-      @submit="handleCreateTask" />
+      :editTask="editingTask"
+      @close="handleCloseModal"
+      @submit="handleCreateTask"
+      @update="handleUpdateTask" />
   </div>
 </template>
 
@@ -317,6 +235,7 @@ import {
 import { useSupabase } from '@/hooks/supabase'
 import { useNewTaskModal } from '@/composables/useNewTaskModal'
 import NewTaskModal from '@/components/modals/NewTaskModal.vue'
+import TaskCard from '@/components/tasks/TaskCard.vue'
 
 const {
   tasks,
@@ -326,6 +245,7 @@ const {
   error,
   getTasks,
   createTask,
+  updateTask,
   toggleTaskStatus,
   deleteTask
 } = useSupabase()
@@ -338,6 +258,7 @@ const selectedDate = ref(null)
 const calendar = ref(null)
 const creatingTask = ref(false)
 const selectedDateForTask = ref(null)
+const editingTask = ref(null) // Nueva ref para la tarea en edición
 
 // Clases CSS
 const activeButtonClass = 'px-3 py-2 bg-primary-500 text-white rounded-lg font-medium shadow-sm'
@@ -437,6 +358,20 @@ const formatSelectedDate = computed(() => {
   }).format(selectedDate.value.date)
 })
 
+// Formatear tarea para el TaskCard (incluyendo hora)
+const formatTaskForCard = (task) => {
+  return {
+    id: task.id,
+    title: task.title,
+    description: task.description,
+    status: task.status,
+    priority: task.priority || 'normal',
+    dueDate: task.due_date,
+    dueTime: task.due_time, // Añadimos la hora
+    tags: task.tags || []
+  }
+}
+
 // Funciones de prioridad
 const getPriorityClass = (priority) => {
   switch (priority) {
@@ -514,6 +449,15 @@ const createTaskForDate = () => {
   console.log('➕ Crear tarea para:', selectedDate.value?.date)
   // Preparar la fecha seleccionada para el modal
   selectedDateForTask.value = selectedDate.value?.date
+  editingTask.value = null // Limpiar edición
+  openModal()
+}
+
+// Handle edit task
+const handleEditTask = (task) => {
+  console.log('✏️ Editar tarea:', task)
+  editingTask.value = task
+  selectedDateForTask.value = null // No preseleccionar fecha en edición
   openModal()
 }
 
@@ -538,23 +482,52 @@ const handleCreateTask = async (taskData) => {
     console.error('❌ Error creando tarea:', err)
   } finally {
     creatingTask.value = false
+    editingTask.value = null
   }
 }
 
-const editTask = (task) => {
-  console.log('✏️ Editar tarea:', task)
-  // TODO: Implementar modal de edición
+// Handle update task
+const handleUpdateTask = async (taskData) => {
+  creatingTask.value = true
+  try {
+    await updateTask(taskData.id, taskData)
+    closeModal()
+    console.log('✅ Tarea actualizada exitosamente')
+  } catch (err) {
+    console.error('❌ Error actualizando tarea:', err)
+  } finally {
+    creatingTask.value = false
+    editingTask.value = null
+  }
 }
 
-const confirmDeleteTask = async (task) => {
-  if (confirm(`¿Estás seguro de que quieres eliminar "${task.title}"?`)) {
+// Handle delete task
+const handleDeleteTask = async (taskId) => {
+  if (confirm('¿Estás seguro de que quieres eliminar esta tarea?')) {
     try {
-      await deleteTask(task.id)
+      await deleteTask(taskId)
       console.log('🗑️ Tarea eliminada exitosamente')
     } catch (err) {
       console.error('❌ Error eliminando tarea:', err)
     }
   }
+}
+
+// Handle update status
+const handleUpdateStatus = async (taskId, newStatus) => {
+  try {
+    await toggleTaskStatus(taskId, newStatus)
+    console.log('✅ Estado actualizado exitosamente')
+  } catch (err) {
+    console.error('❌ Error actualizando estado:', err)
+  }
+}
+
+// Handle close modal
+const handleCloseModal = () => {
+  editingTask.value = null
+  selectedDateForTask.value = null
+  closeModal()
 }
 
 // Cargar tareas al montar

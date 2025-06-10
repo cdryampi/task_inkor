@@ -1,0 +1,60 @@
+{
+    "functions": {
+        "api/health.js": {
+            "maxDuration": 10
+        },
+        "api/proxy.js": {
+            "maxDuration": 30
+        },
+        "api/test.js": {
+            "maxDuration": 10
+        },
+        "api/openai.js": {
+            "maxDuration": 30
+        },
+        "api/supabase.js": {
+            "maxDuration": 20
+        }
+    },
+    "rewrites": [
+        {
+            "source": "/api/health",
+            "destination": "/api/health.js"
+        },
+        {
+            "source": "/api/proxy",
+            "destination": "/api/proxy.js"
+        },
+        {
+            "source": "/api/test",
+            "destination": "/api/test.js"
+        },
+        {
+            "source": "/api/openai",
+            "destination": "/api/openai.js"
+        },
+        {
+            "source": "/api/supabase/(.*)",
+            "destination": "/api/supabase.js"
+        }
+    ],
+    "headers": [
+        {
+            "source": "/api/(.*)",
+            "headers": [
+                {
+                    "key": "Access-Control-Allow-Origin",
+                    "value": "*"
+                },
+                {
+                    "key": "Access-Control-Allow-Methods",
+                    "value": "GET, POST, PUT, DELETE, OPTIONS"
+                },
+                {
+                    "key": "Access-Control-Allow-Headers",
+                    "value": "Content-Type, Authorization, X-Requested-With"
+                }
+            ]
+        }
+    ]
+}
