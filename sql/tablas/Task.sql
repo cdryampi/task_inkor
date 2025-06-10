@@ -76,3 +76,17 @@ INSERT INTO public.Task (title, description, status) VALUES
 ('Estudiar PostgreSQL', 'Revisar documentación de RLS y políticas', 'pending'),
 ('Hacer ejercicio', 'Rutina de 30 minutos', 'completed'),
 ('Leer libro técnico', 'Continuar con el capítulo 5', 'pending');
+
+
+-- Añadir campos de fecha y prioridad a la tabla task
+ALTER TABLE task 
+ADD COLUMN IF NOT EXISTS due_date DATE,
+ADD COLUMN IF NOT EXISTS due_time TIME,
+ADD COLUMN IF NOT EXISTS priority VARCHAR(20) DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'medium', 'high'));
+
+-- Insertar algunas tareas de ejemplo con fechas
+INSERT INTO task (title, description, status, due_date, due_time, priority) VALUES
+('Reunión con equipo', 'Planificación del sprint', 'pending', CURRENT_DATE, '10:00:00', 'high'),
+('Revisar código', 'Pull request del proyecto X', 'pending', CURRENT_DATE + INTERVAL '1 day', '14:30:00', 'medium'),
+('Completar documentación', 'Actualizar README del proyecto', 'pending', CURRENT_DATE + INTERVAL '2 days', '16:00:00', 'normal'),
+('Llamada con cliente', 'Seguimiento del proyecto', 'completed', CURRENT_DATE - INTERVAL '1 day', '11:00:00', 'high');

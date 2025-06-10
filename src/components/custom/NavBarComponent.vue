@@ -4,7 +4,7 @@
       <!-- Logo y título -->
       <router-link to="/" class="flex items-center space-x-3 rtl:space-x-reverse">
           <img src="/logo-inkor.svg" class="h-8" alt="Inkor Logo" />
-          <span class="self-center text-2xl font-bold whitespace-nowrap text-primary-800">TaskFlow</span>
+          <span class="self-center text-2xl font-bold whitespace-nowrap text-primary-800">MotivBot</span>
       </router-link>
 
       <!-- Botón móvil -->
@@ -72,6 +72,19 @@
               <span>Configuración</span>
             </router-link>
           </li>
+          <!-- link para el calendario -->
+           <li>
+            <router-link
+              to="/calendario"
+              class="flex items-center space-x-2 py-2 px-4 rounded-lg transition-all duration-200"
+              :class="isActiveRoute('/calendario') ?
+                'text-white bg-primary-500 shadow-sm md:bg-transparent md:text-primary-600 md:shadow-none font-semibold' :
+                'text-primary-700 hover:bg-primary-200 md:hover:bg-transparent md:hover:text-primary-500 hover:font-semibold'"
+              @click="closeMobileMenu">
+              <CalendarIcon class="w-5 h-5" />
+              <span>Calendario</span>
+            </router-link>
+           </li>
           <li>
             <button
               @click="handleNewTaskClick"
@@ -95,6 +108,7 @@ import {
   CheckCircleIcon,
   ChartBarIcon,
   Cog6ToothIcon,
+  CalendarIcon,
   PlusCircleIcon
 } from '@heroicons/vue/24/outline'
 import { useNewTaskModal } from '@/composables/useNewTaskModal'

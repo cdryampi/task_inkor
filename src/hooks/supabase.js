@@ -81,11 +81,33 @@ export const useSupabase = () => {
     try {
       console.log('➕ Creando tarea en tabla:', tableName.value, taskData)
 
-      const newTask = {
-        title: taskData.title,
-        description: taskData.description || null,
-        status: 'pending'
+      // Validaciones
+      if (!taskData || typeof taskData !== 'object') {
+        throw new Error('Datos de tarea inválidos')
       }
+
+      if (!taskData.title || !taskData.title.trim()) {
+        throw new Error('El título es requerido')
+      }
+
+      // Preparar datos de manera segura
+      const newTask = {
+        title: String(taskData.title).trim(),
+        description: taskData.description ? String(taskData.description).trim() : null,
+        status: taskData.status || 'pending',
+        due_date: taskData.due_date || null,
+        due_time: taskData.due_time || null,
+        priority: taskData.priority || 'normal'
+      }
+
+      // Limpiar campos vacíos
+      Object.keys(newTask).forEach(key => {
+        if (newTask[key] === '' || newTask[key] === undefined) {
+          newTask[key] = null
+        }
+      })
+
+      console.log('📝 Datos preparados para insertar:', newTask)
 
       const { data, error: supabaseError } = await supabase
         .from(tableName.value)
@@ -94,15 +116,24 @@ export const useSupabase = () => {
 
       if (supabaseError) {
         console.error('❌ Error creando tarea:', supabaseError)
-        throw new Error(`Error al crear tarea: ${supabaseError.message}`)
+
+        if (supabaseError.code === '23505') {
+          throw new Error('Ya existe una tarea con estos datos')
+        } else if (supabaseError.code === '42703') {
+          throw new Error('Error en la estructura de datos')
+        } else {
+          throw new Error(`Error al crear tarea: ${supabaseError.message}`)
+        }
       }
 
-      console.log('✅ Tarea creada:', data[0])
+      if (!data || data.length === 0) {
+        throw new Error('No se pudo crear la tarea')
+      }
+
+      console.log('✅ Tarea creada exitosamente:', data[0])
 
       // Actualizar lista de tareas
-      if (data && data.length > 0) {
-        tasks.value.unshift(data[0])
-      }
+      tasks.value.unshift(data[0])
 
       return data[0]
     } catch (err) {
@@ -115,7 +146,7 @@ export const useSupabase = () => {
     }
   }
 
-  // Actualizar tarea
+  // Actualizar tarea - VERSIÓN MEJORADA
   const updateTask = async (id, updates) => {
     loading.value = true
     error.value = null
@@ -123,29 +154,63 @@ export const useSupabase = () => {
     try {
       console.log('🔄 Actualizando tarea en tabla:', tableName.value, { id, updates })
 
-      // Validar que el ID existe
+      // Validaciones iniciales
       if (!id) {
         throw new Error('ID de tarea es requerido')
       }
 
-      // Validar que hay actualizaciones
-      if (!updates || Object.keys(updates).length === 0) {
+      if (!updates || typeof updates !== 'object' || Object.keys(updates).length === 0) {
         throw new Error('No hay datos para actualizar')
       }
 
+      // Campos permitidos para actualizar
+      const allowedFields = ['title', 'description', 'status', 'due_date', 'due_time', 'priority']
+
+      // Filtrar solo campos válidos usando método moderno
+      const validUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([key, value]) => {
+          // Verificar que el campo está permitido
+          if (!allowedFields.includes(key)) {
+            console.warn(`⚠️ Campo '${key}' no está permitido, se omitirá`)
+            return false
+          }
+
+          // Permitir valores null, undefined se filtra
+          return value !== undefined
+        })
+      )
+
+      // Verificar que hay campos válidos para actualizar
+      if (Object.keys(validUpdates).length === 0) {
+        throw new Error('No hay campos válidos para actualizar')
+      }
+
+      console.log('📝 Datos validados para actualizar:', validUpdates)
+
+      // Ejecutar actualización
       const { data, error: supabaseError } = await supabase
         .from(tableName.value)
-        .update(updates)
+        .update(validUpdates)
         .eq('id', id)
         .select()
 
       if (supabaseError) {
         console.error('❌ Error de Supabase al actualizar:', supabaseError)
-        throw new Error(`Error de Supabase: ${supabaseError.message || JSON.stringify(supabaseError)}`)
+
+        // Manejo específico de errores comunes
+        if (supabaseError.code === '23505') {
+          throw new Error('Ya existe una tarea con estos datos')
+        } else if (supabaseError.code === '42703') {
+          throw new Error('Campo no válido en la base de datos')
+        } else if (supabaseError.code === 'PGRST116') {
+          throw new Error('Tarea no encontrada')
+        } else {
+          throw new Error(`Error de Supabase: ${supabaseError.message}`)
+        }
       }
 
       if (!data || data.length === 0) {
-        throw new Error('No se encontró la tarea para actualizar')
+        throw new Error('No se encontró la tarea para actualizar (posiblemente fue eliminada)')
       }
 
       console.log('✅ Tarea actualizada:', data[0])
@@ -153,9 +218,12 @@ export const useSupabase = () => {
       // Actualizar en el array local
       const index = tasks.value.findIndex(task => task.id == id)
       if (index !== -1) {
-        tasks.value[index] = data[0]
+        tasks.value[index] = { ...tasks.value[index], ...data[0] }
+        console.log('✅ Array local actualizado')
       } else {
-        console.warn('⚠️ Tarea no encontrada en el array local')
+        console.warn('⚠️ Tarea no encontrada en el array local, refrescando...')
+        // Opcionalmente recargar todas las tareas si no se encuentra localmente
+        await getTasks()
       }
 
       return data[0]
