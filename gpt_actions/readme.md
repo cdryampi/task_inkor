@@ -1,0 +1,2 @@
+## Fichero YAML para definir acciones de GPT actions
+Este fichero define las acciones que puede realizar el modelo GPT, incluyendo la descripción de cada acción, los parámetros necesarios y los tipos de datos esperados.
