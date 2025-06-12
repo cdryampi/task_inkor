@@ -456,7 +456,7 @@ BEGIN
     IF p_task_id IS NOT NULL AND p_role IS NOT NULL THEN
         -- Filtrar por task_id y role
         EXECUTE format('
-            SELECT COALESCE(json_agg(conv_json ORDER BY %s), ''[]''::json)
+            SELECT COALESCE(json_agg(conv_json), ''[]''::json)
             FROM (
                 SELECT json_build_object(
                     ''id'', id,
@@ -474,7 +474,6 @@ BEGIN
                 ORDER BY %s
                 LIMIT $3
             ) conversations',
-            CASE WHEN has_created_at THEN 'created_at DESC' ELSE 'id DESC' END,
             CASE WHEN has_tokens_used THEN ', ''tokens_used'', tokens_used' ELSE '' END,
             CASE WHEN has_model_used THEN ', ''model_used'', model_used' ELSE '' END,
             CASE WHEN has_response_time_ms THEN ', ''response_time_ms'', response_time_ms' ELSE '' END,
@@ -485,7 +484,7 @@ BEGIN
     ELSIF p_task_id IS NOT NULL THEN
         -- Filtrar solo por task_id
         EXECUTE format('
-            SELECT COALESCE(json_agg(conv_json ORDER BY %s), ''[]''::json)
+            SELECT COALESCE(json_agg(conv_json), ''[]''::json)
             FROM (
                 SELECT json_build_object(
                     ''id'', id,
@@ -503,7 +502,6 @@ BEGIN
                 ORDER BY %s
                 LIMIT $2
             ) conversations',
-            CASE WHEN has_created_at THEN 'created_at DESC' ELSE 'id DESC' END,
             CASE WHEN has_tokens_used THEN ', ''tokens_used'', tokens_used' ELSE '' END,
             CASE WHEN has_model_used THEN ', ''model_used'', model_used' ELSE '' END,
             CASE WHEN has_response_time_ms THEN ', ''response_time_ms'', response_time_ms' ELSE '' END,
@@ -514,7 +512,7 @@ BEGIN
     ELSIF p_role IS NOT NULL THEN
         -- Filtrar solo por role
         EXECUTE format('
-            SELECT COALESCE(json_agg(conv_json ORDER BY %s), ''[]''::json)
+            SELECT COALESCE(json_agg(conv_json), ''[]''::json)
             FROM (
                 SELECT json_build_object(
                     ''id'', id,
@@ -532,7 +530,6 @@ BEGIN
                 ORDER BY %s
                 LIMIT $2
             ) conversations',
-            CASE WHEN has_created_at THEN 'created_at DESC' ELSE 'id DESC' END,
             CASE WHEN has_tokens_used THEN ', ''tokens_used'', tokens_used' ELSE '' END,
             CASE WHEN has_model_used THEN ', ''model_used'', model_used' ELSE '' END,
             CASE WHEN has_response_time_ms THEN ', ''response_time_ms'', response_time_ms' ELSE '' END,
@@ -543,7 +540,7 @@ BEGIN
     ELSE
         -- Sin filtros
         EXECUTE format('
-            SELECT COALESCE(json_agg(conv_json ORDER BY %s), ''[]''::json)
+            SELECT COALESCE(json_agg(conv_json), ''[]''::json)
             FROM (
                 SELECT json_build_object(
                     ''id'', id,
@@ -560,7 +557,6 @@ BEGIN
                 ORDER BY %s
                 LIMIT $1
             ) conversations',
-            CASE WHEN has_created_at THEN 'created_at DESC' ELSE 'id DESC' END,
             CASE WHEN has_tokens_used THEN ', ''tokens_used'', tokens_used' ELSE '' END,
             CASE WHEN has_model_used THEN ', ''model_used'', model_used' ELSE '' END,
             CASE WHEN has_response_time_ms THEN ', ''response_time_ms'', response_time_ms' ELSE '' END,
