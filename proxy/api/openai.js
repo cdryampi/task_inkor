@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     }
 
     // Validate request body
-    const { message, context, taskData } = req.body;
+    const { message, context, taskData, conversationHistory } = req.body;
 
     if (!message || typeof message !== 'string' || message.trim().length === 0) {
       return res.status(400).json({
@@ -41,7 +41,7 @@ export default async function handler(req, res) {
     // Sanitize message (basic security)
     const sanitizedMessage = message.trim().substring(0, 1000);
 
-    // Build system prompt for MotivBot
+    // Build system prompt for MotivBot with conversation awareness
     const systemPrompt = `Eres MotivBot 🤖💙, un asistente emocional especializado en gestión de tareas y bienestar.
 
 PERSONALIDAD:
@@ -49,6 +49,7 @@ PERSONALIDAD:
 - Usa emojis apropiados
 - Respuestas concisas pero útiles
 - Enfoque en bienestar emocional
+- IMPORTANTE: Mantén coherencia con conversaciones anteriores
 
 CONTEXTO DE LA APP:
 - App de tareas llamada "MotivBot"
@@ -60,12 +61,28 @@ CONTEXTO DE LA APP:
 REGLAS:
 - Respuestas máximo 200 palabras
 - Siempre positivo y constructivo
+- Si hay historial previo, referéncialo cuando sea relevante
+- No repitas consejos ya dados anteriormente
 - Si no entiendes algo, pide clarificación
 - No dar consejos médicos profesionales
-- Enfócate en motivación y organización`;
+- Enfócate en motivación y organización
 
-    // Build user prompt with context
+${conversationHistory && conversationHistory.length > 0 ?
+  `NOTA: Esta conversación tiene historial previo. Mantén coherencia y evita repetir consejos.` :
+  `NOTA: Esta es una nueva conversación sin historial previo.`}`;
+
+    // Build user prompt with enhanced context
     let userPrompt = sanitizedMessage;
+
+    // Add conversation history summary if exists
+    if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+      const recentHistory = conversationHistory.slice(-5); // Últimas 5 para no sobrecargar
+      const historyText = recentHistory.map(conv =>
+        `${conv.role === 'user' ? 'Usuario' : 'MotivBot'}: ${conv.message.substring(0, 150)}...`
+      ).join('\n');
+
+      userPrompt += `\n\n--- Historial reciente de la conversación ---\n${historyText}\n--- Fin del historial ---`;
+    }
 
     // Add task context if provided
     if (taskData && typeof taskData === 'object') {
@@ -85,7 +102,7 @@ REGLAS:
       userPrompt += `\n\nContexto adicional: ${context.trim().substring(0, 300)}`;
     }
 
-    console.log('🤖 Sending request to OpenAI...');
+    console.log('🤖 Sending request to OpenAI with history context...');
 
     // Make request to OpenAI
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {

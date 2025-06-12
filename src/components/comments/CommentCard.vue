@@ -27,9 +27,12 @@
         <button
           v-if="comment.type === 'user'"
           @click="askAI"
+          :disabled="aiLoading"
           class="action-btn ai-btn"
-          title="Pedir consejo a la AI">
-          <SparklesIcon class="w-4 h-4" />
+          :class="{ 'loading': aiLoading }"
+          :title="aiLoading ? 'Pidiendo consejo...' : 'Pedir consejo a la AI'">
+          <div v-if="aiLoading" class="loading-spinner"></div>
+          <SparklesIcon v-else class="w-4 h-4" />
         </button>
         <button
           @click="copyContent"
@@ -146,6 +149,10 @@ const props = defineProps({
   comment: {
     type: Object,
     required: true
+  },
+  aiLoading: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -226,6 +233,7 @@ const confirmDelete = async () => {
 }
 
 const askAI = () => {
+  console.log('💬 CommentCard - Solicitando consejo de AI para:', props.comment.content)
   emit('ask-ai', props.comment.content)
 }
 
@@ -518,6 +526,25 @@ const getReactionCount = (type) => {
 .comment-card.deleting {
   opacity: 0.5;
   pointer-events: none;
+}
+
+.ai-btn.loading {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #e5e7eb;
+  border-top: 2px solid #8b5cf6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* Responsive */

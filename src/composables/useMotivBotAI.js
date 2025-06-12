@@ -1,40 +1,47 @@
 import { ref } from 'vue'
-import { useConversations } from './useConversations'
 
 const isLoading = ref(false)
 const error = ref(null)
 
 export const useMotivBotAI = () => {
-  const { createUserMessage, createAssistantMessage, getConversationContext } = useConversations()
-
-  const askMotivBotWithContext = async (taskId, message, taskData = null) => {
+  const askMotivBotWithContext = async (taskId, message, taskData = null, conversationHistory = []) => {
     isLoading.value = true
     error.value = null
     const startTime = Date.now()
 
     try {
-      // 1. Guardar mensaje del usuario
-      await createUserMessage(taskId, message)
-
-      // 2. Obtener contexto de la conversación
-      const conversationContext = getConversationContext(taskData)
-
-      // 3. Preparar petición a OpenAI
+      // 1. Preparar petición a OpenAI
       const proxyServer = import.meta.env.VITE_PROXY_SERVER
       if (!proxyServer) {
         throw new Error('VITE_PROXY_SERVER no está configurado')
       }
 
-      const requestBody = {
-        message: message.trim(),
-        context: conversationContext,
-        taskData: taskData
+      // 2. Preparar historial de conversación para el contexto
+      let conversationContext = ''
+      if (conversationHistory && conversationHistory.length > 0) {
+        // Limitar a las últimas 10 conversaciones para no sobrecargar
+        const recentHistory = conversationHistory.slice(-10)
+
+        conversationContext = recentHistory.map(conv => {
+          const role = conv.role === 'user' ? 'Usuario' : 'MotivBot'
+          return `${role}: ${conv.message}`
+        }).join('\n')
+
+        console.log('📝 Incluyendo historial de conversación:', recentHistory.length, 'mensajes')
       }
 
-      console.log('🤖 Enviando consulta a MotivBot con contexto...', {
+      const requestBody = {
+        message: message.trim(),
+        context: `Ayuda al usuario con su comentario sobre la tarea. ${conversationContext ? `\n\nHistorial de conversación:\n${conversationContext}` : ''}`,
+        taskData: taskData,
+        conversationHistory: conversationHistory // Enviar también el historial completo
+      }
+
+      console.log('🤖 Enviando consulta a MotivBot...', {
         message: message.substring(0, 50) + '...',
-        hasContext: !!conversationContext,
-        taskId
+        taskId,
+        hasTaskData: !!taskData,
+        historyLength: conversationHistory?.length || 0
       })
 
       const response = await fetch(`${proxyServer}/api/openai`, {
@@ -56,21 +63,13 @@ export const useMotivBotAI = () => {
         throw new Error('Respuesta inválida del servidor')
       }
 
-      // 4. Guardar respuesta del asistente
-      const responseTime = Date.now() - startTime
-      await createAssistantMessage(taskId, data.message, {
-        tokensUsed: data.usage?.total_tokens || 0,
-        modelUsed: 'gpt-3.5-turbo',
-        responseTime: responseTime
-      })
-
-      console.log('✅ Conversación guardada correctamente')
+      console.log('✅ Respuesta de MotivBot recibida')
 
       return {
         message: data.message,
         usage: data.usage,
         timestamp: data.timestamp,
-        responseTime: responseTime
+        responseTime: Date.now() - startTime
       }
 
     } catch (err) {

@@ -167,6 +167,7 @@
                 v-for="comment in formattedConversations"
                 :key="comment.id"
                 :comment="comment"
+                :aiLoading="aiLoading"
                 @delete="deleteComment"
                 @ask-ai="askAI"
                 @update-feedback="updateConversationFeedback" />
@@ -350,6 +351,7 @@ import {
 } from '@heroicons/vue/24/solid'
 import { useSupabase } from '@/hooks/supabase'
 import { useConversationsCRUD } from '@/composables/useConversationsCRUD'
+import { useMotivBotAI } from '@/composables/useMotivBotAI'
 import NewTaskModal from '@/components/modals/NewTaskModal.vue'
 import CommentCard from '@/components/comments/CommentCard.vue'
 
@@ -369,6 +371,9 @@ const {
   deleteConversation,
   addGPTConversation
 } = useConversationsCRUD()
+
+// ✅ AGREGAR EL COMPOSABLE DE MOTIVBOT
+const { askMotivBotWithContext, isLoading: aiLoading } = useMotivBotAI()
 
 // Estado completamente local
 const task = ref(null)
@@ -521,29 +526,67 @@ const addComment = async () => {
   }
 }
 
-// ✅ ARREGLAR askAI para usar task_id correcto
+// ✅ MEJORAR askAI para incluir historial de conversaciones
 const askAI = async (commentContent) => {
   try {
-    // Create AI response using RPC function
+    console.log('🤖 TaskDetailView - Pidiendo consejo a MotivBot...', commentContent)
+
+    const taskId = parseInt(route.params.id)
+
+    // Crear datos de contexto de la tarea
+    const taskContextData = {
+      title: task.value?.title,
+      description: task.value?.description,
+      status: task.value?.status,
+      priority: task.value?.priority,
+      due_date: task.value?.due_date
+    }
+
+    // Preparar historial de conversaciones (ordenado cronológicamente)
+    const sortedHistory = [...conversations.value].sort((a, b) =>
+      new Date(a.created_at) - new Date(b.created_at)
+    )
+
+    console.log('📋 Incluyendo historial:', {
+      totalConversations: sortedHistory.length,
+      userComments: sortedHistory.filter(c => c.role === 'user').length,
+      aiComments: sortedHistory.filter(c => c.role === 'assistant').length
+    })
+
+    // Obtener respuesta de MotivBot con historial
+    const aiResponse = await askMotivBotWithContext(
+      taskId,
+      `Dame un consejo sobre este comentario: "${commentContent}"`,
+      taskContextData,
+      sortedHistory // ✅ PASAR EL HISTORIAL
+    )
+
+    console.log('🤖 Respuesta de MotivBot:', aiResponse.message)
+
+    // Guardar la respuesta como conversación de asistente
     await addGPTConversation(
-      parseInt(route.params.id),
+      taskId,
       'assistant',
-      `Basándome en tu comentario "${commentContent}", te sugiero lo siguiente: Esta es una excelente observación. Para avanzar de manera efectiva, podrías considerar establecer pequeños hitos intermedios que te permitan evaluar el progreso regularmente. ¿Te gustaría que te ayude a estructurar estos pasos? 💡`,
+      aiResponse.message,
       {
         source: 'task_detail_ai_button',
-        modelUsed: 'gpt-4',
-        tokensUsed: 120
+        modelUsed: 'gpt-3.5-turbo',
+        tokensUsed: aiResponse.usage?.total_tokens || 0,
+        responseTime: aiResponse.responseTime,
+        historyIncluded: sortedHistory.length
       }
     )
 
-    // Reload conversations
+    // Recargar conversaciones
     await loadConversations()
 
+    console.log('✅ TaskDetailView - Consejo de AI agregado exitosamente')
+
   } catch (err) {
-    console.error('Error obteniendo respuesta de AI:', err)
+    console.error('❌ TaskDetailView - Error obteniendo consejo de AI:', err)
+    error.value = 'Error al obtener consejo de la AI'
   }
 }
-
 const deleteComment = async (commentId) => {
   try {
     // Use the deleteConversation method from composable
