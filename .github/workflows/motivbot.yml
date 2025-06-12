@@ -22,9 +22,10 @@ jobs:
   validate-setup:
     name: Validate Test Setup
     runs-on: ubuntu-latest
+    environment: motivbot  # 👈 Agregar environment
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Check requirements.txt
       run: |
@@ -46,16 +47,17 @@ jobs:
   test-motivbot:
     name: MotivBot RPC Tests
     runs-on: ubuntu-latest
+    environment: motivbot
     needs: validate-setup
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       
-    - name: Set up Python
-      uses: actions/setup-python@v3
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: ${{ env.PYTHON_VERSION }}
         
     - name: Cache pip dependencies
       uses: actions/cache@v3
@@ -64,14 +66,6 @@ jobs:
         key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-
-          
-    - name: Fallback if cache is unavailable
-      run: |
-        if [ ! -d ~/.cache/pip ]; then
-          echo "⚠️ Cache unavailable, proceeding with fresh dependency installation."
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-        fi
           
     - name: Install dependencies
       run: |
@@ -83,13 +77,50 @@ jobs:
         echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> .env
         echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env
         
-    - name: Verify environment setup
+    - name: Debug environment variables
       run: |
-        if [ ! -f .env ]; then
-          echo "❌ .env file not created"
-          exit 1
+        echo "🔍 Checking environment setup..."
+        if [ -f .env ]; then
+          echo "✅ .env file exists"
+          echo "📋 .env file contents (sanitized):"
+          sed 's/=.*/=***HIDDEN***/' .env
+        else
+          echo "❌ .env file not found"
         fi
-        echo "✅ Environment variables configured"
+        
+        echo "🔍 Checking if secrets are available..."
+        if [ -z "${{ secrets.VITE_SUPABASE_URL }}" ]; then
+          echo "❌ VITE_SUPABASE_URL secret is empty or not set"
+        else
+          echo "✅ VITE_SUPABASE_URL secret is available"
+        fi
+        
+        if [ -z "${{ secrets.VITE_SUPABASE_ANON_KEY }}" ]; then
+          echo "❌ VITE_SUPABASE_ANON_KEY secret is empty or not set"
+        else
+          echo "✅ VITE_SUPABASE_ANON_KEY secret is available"
+        fi
+        
+    - name: Test environment loading in Python
+      run: |
+        python -c "
+        import os
+        from dotenv import load_dotenv
+        
+        print('🐍 Testing Python environment loading...')
+        load_dotenv()
+        
+        url = os.getenv('VITE_SUPABASE_URL')
+        key = os.getenv('VITE_SUPABASE_ANON_KEY')
+        
+        print(f'URL loaded: {\"✅ Yes\" if url else \"❌ No\"} (length: {len(url) if url else 0})')
+        print(f'Key loaded: {\"✅ Yes\" if key else \"❌ No\"} (length: {len(key) if key else 0})')
+        
+        if url:
+            print(f'URL starts with: {url[:30]}...')
+        if key:
+            print(f'Key starts with: {key[:20]}...')
+        "
         
     - name: Run MotivBot function tests
       run: |
