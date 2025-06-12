@@ -57,3 +57,4 @@ test_motivbot_functions.py::TestMotivbotErrorHandling::test_invalid_rpc_function
 ### Notas
 - Asegúrate de que las variables de entorno necesarias estén configuradas correctamente antes de ejecutar las pruebas.
 - Las pruebas están diseñadas para ejecutarse en un entorno aislado, por lo que no deben afectar a los datos reales del MotivBot.
+- Las pruebas se pueden ejecutar por la pipeline de github actions, para garantizar que las funciones del MotivBot funcionen correctamente.
