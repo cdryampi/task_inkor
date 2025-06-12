@@ -1,179 +1,69 @@
-# MotivBot 🤖💙
-### *Your Emotional Task Companion*
+# MotivBot
 
-> Una aplicación inteligente de gestión de tareas que combina productividad con bienestar emocional, ofreciendo apoyo personalizado a través de IA.
+MotivBot es un pequeño gestor de tareas escrito en **Vue 3** que se apoya en **Supabase** para el almacenamiento y en **OpenAI** para ofrecer recomendaciones motivacionales. Este repositorio contiene tanto la aplicación de cliente como un proxy ligero utilizado para evitar problemas de CORS cuando se accede a Supabase u OpenAI.
 
----
+## Características
 
-## 🌟 **¿Qué es MotivBot?**
+- CRUD de tareas con título, descripción, prioridad y fechas.
+- Vista de calendario integrada con [v-calendar](https://vcalendar.io/).
+- Registro de conversaciones para cada tarea y asistencia de "MotivBot" mediante IA.
+- Proxy opcional para redirigir peticiones a Supabase y a OpenAI.
+- Scripts SQL para crear las tablas y funciones utilizadas en Supabase.
 
-MotivBot no es solo otra app de tareas. Es tu **compañero emocional** que entiende que detrás de cada tarea hay una persona con sentimientos, estrés y necesidades únicas.
+## Estructura del proyecto
 
-### 💡 **La Filosofía**
-- **Productividad + Bienestar** = Éxito sostenible
-- **Empatía** antes que eficiencia
-- **Apoyo personalizado** según tu estado emocional
-- **Tecnología al servicio** del bienestar humano
-
----
-
-## ✨ **Características Principales**
-
-### 📋 **Gestión Inteligente de Tareas**
-- ✅ CRUD completo de tareas
-- 📅 Calendario visual integrado
-- 🎯 Sistema de prioridades
-- 📊 Estadísticas y métricas
-- 🔄 Sincronización en tiempo real
-
-### 🤗 **Apoyo Emocional con IA**
-- 🧠 **Análisis emocional** de tu carga de trabajo
-- 💬 **Chat con MotivBot AI** para consejos personalizados
-- 🎭 **Detección de patrones** de estrés y procrastinación
-- 🌱 **Sugerencias de bienestar** adaptadas a tu situación
-- 💌 **Mensajes motivacionales** contextuales
-
-### 🎨 **Experiencia de Usuario**
-- 🌈 Diseño alegre y motivador
-- 📱 Completamente responsive
-- ⚡ Carga rápida y fluida
-- 🎪 Microinteracciones deliciosas
-
----
-
-## 🏗️ **Arquitectura Técnica**
-
-### 🎯 **Frontend**
-```bash
-Vue 3 + Composition API
-├── Vite (Build tool)
-├── Tailwind CSS (Styling)
-├── Heroicons (Iconografía)
-├── V-Calendar (Calendario)
-├── Headless UI (Componentes)
-└── Pinia (Estado global)
+```
+/                Código principal de la aplicación Vue
+├─ src/          Componentes, vistas y composables
+├─ public/       Recursos estáticos
+├─ proxy/        Servidor proxy (deploy en Vercel)
+├─ sql/          Scripts para la base de datos
+└─ gpt_actions/  Especificación OpenAPI y documentación del bot
 ```
 
-### 🛢️ **Backend & Base de Datos**
+## Requisitos
+
+- Node.js 18 o superior
+- Una instancia de Supabase
+- Claves de API para OpenAI si se utiliza el chat motivacional
+
+## Puesta en marcha
+
+1. Instalar las dependencias del proyecto:
+   ```bash
+   npm install
+   ```
+2. Copiar el fichero `.env.example` a `.env` y rellenar los valores de `SUPABASE_URL`, `SUPABASE_ANON_KEY` y, opcionalmente, `OPENAI_API_KEY` y `ALLOWED_ORIGINS`.
+3. Iniciar el servidor de desarrollo:
+   ```bash
+   npm run dev
+   ```
+   La aplicación estará disponible normalmente en `http://localhost:5173`.
+
+### Uso del proxy
+
+El directorio `proxy/` contiene un pequeño servidor preparado para desplegarse en Vercel. Este proxy simplifica las llamadas a Supabase y a OpenAI cuando existen restricciones de CORS o se quiere ocultar la clave pública.
+
+Para ejecutarlo de forma local:
+
 ```bash
-Supabase
-├── PostgreSQL (Base de datos)
-├── Realtime (Sincronización)
-├── Auth (Autenticación)
-├── Storage (Archivos)
-└── Edge Functions (Lógica serverless)
+cd proxy
+npm install
+npm run dev # necesita Vercel CLI
 ```
 
-### 🤖 **IA & Integrations**
-```bash
-MotivBot AI
-├── Custom GPT (OpenAI)
-├── Proxy Server (Seguridad y rendimiento)
-└── Webhooks (Integraciones en tiempo real)
-```
+Recuerda establecer las variables de entorno indicadas en `proxy/README.md`.
+
+## Base de datos
+
+Los scripts dentro de `sql/` definen las tablas `Task` y `Conversation`, además de varias funciones RPC para consultas y mantenimiento. Pueden ejecutarse directamente en Supabase para recrear el esquema necesario.
+
+## Documentación adicional
+
+- `gpt_actions/motivbot.yaml` describe la API disponible para integraciones automatizadas.
+- `gpt_actions/instrucciones.md` contiene las instrucciones de comportamiento para la IA.
+- El archivo `TODO.md` enumera tareas y mejoras pendientes.
 
 ---
 
-## 🚀 **Roadmap**
-
-### **Fase 1: Lanzamiento Inicial**
-- [x] Investigación y validación de la idea
-- [x] Desarrollo del MVP (Producto Mínimo Viable)
-- [x] Pruebas con usuarios reales
-- [x] Lanzamiento en plataformas seleccionadas
-
-### **Fase 2: Crecimiento y Expansión**
-- [ ] Incorporación de feedback y mejoras
-- [ ] Expansión de la base de usuarios
-- [ ] Integraciones con otras herramientas
-- [ ] Inicio de la monetización
-
-### **Fase 3: Consolidación como Líder de Mercado**
-- [ ] Nuevas características basadas en IA
-- [ ] Expansión a nuevos mercados e idiomas
-- [ ] Alianzas estratégicas
-- [ ] Optimización continua y soporte premium
-
----
-
-## 👥 **Equipo Detrás de MotivBot**
-
-### **Fundadores**
-- **Alex Martínez** - CEO & Visionario
-- **Sofía López** - CTO & Gurú Tecnológica
-- **David Pérez** - CMO & Maestro del Crecimiento
-
-### **Desarrolladores**
-- **Laura Gómez** - Frontend
-- **Juan Rodríguez** - Backend
-- **Ana Torres** - IA y Machine Learning
-
-### **Diseñadores**
-- **Luis Fernández** - UI/UX
-- **Marta Sánchez** - Branding y Marketing
-
----
-
-## 📈 **Métricas Clave**
-
-- **Usuarios Activos Mensuales**: 10,000+
-- **Tareas Gestionadas**: 1,000,000+
-- **Satisfacción del Usuario**: 95%
-- **Tasa de Crecimiento Mensual**: 20%
-
----
-
-## 📝 **Testimonios**
-
-> "MotivBot ha cambiado mi vida. No solo soy más productivo, sino que también me siento más equilibrado emocionalmente." - **Usuario Feliz**
-
-> "La integración con otras herramientas que uso a diario fue perfecta. MotivBot es, sin duda, el futuro de la gestión de tareas." - **Profesional Satisfecho**
-
----
-
-## 📅 **Próximos Eventos y Webinars**
-
-- **Webinar Gratuito**: "Cómo la IA puede mejorar tu productividad y bienestar" - **Fecha**: 15 de Noviembre, 2023
-- **Taller**: "Integrando MotivBot en tu flujo de trabajo diario" - **Fecha**: 22 de Noviembre, 2023
-- **Charla**: "El futuro de la gestión de tareas: Tendencias y predicciones" - **Fecha**: 30 de Noviembre, 2023
-
----
-
-## 📚 **Recursos Adicionales**
-
-- **Blog**: Artículos sobre productividad, bienestar y tecnología.
-- **Guías**: Documentación detallada sobre el uso de MotivBot y mejores prácticas.
-- **Comunidad**: Acceso a un foro exclusivo para usuarios de MotivBot.
-
----
-
-## 🤝 **Colabora con Nosotros**
-
-Estamos en constante búsqueda de talento y nuevas ideas. Si eres un apasionado de la tecnología, el bienestar o la productividad, ¡queremos saber de ti!
-
----
-
-## 📞 **Contacto**
-
-- **Email**: contacto@MotivBot.com
-- **Teléfono**: +34 600 123 456
-- **Dirección**: Calle Ejemplo, 123, 28001 Madrid, España
-
----
-
-## 🌐 **Síguenos en Redes Sociales**
-
-- **Twitter**: [@MotivBotApp](https://twitter.com/MotivBotApp)
-- **Facebook**: [MotivBotApp](https://facebook.com/MotivBotApp)
-- **Instagram**: [@MotivBotApp](https://instagram.com/MotivBotApp)
-- **LinkedIn**: [MotivBot](https://linkedin.com/company/MotivBot)
-
----
-
-## 📢 **Notas Legales**
-
-MotivBot es una marca registrada. Todos los derechos reservados. El uso no autorizado de cualquier material de este documento está estrictamente prohibido.
-
----
-
-**Versión 1.0 - Última Actualización: Octubre 2023**
+Este proyecto es experimental y sirve como ejemplo de integración entre Vue, Supabase y servicios de IA. Si encuentras algún problema o quieres proponer mejoras, abre una issue o un pull request.
