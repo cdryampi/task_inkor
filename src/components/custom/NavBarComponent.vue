@@ -71,7 +71,7 @@
         <!-- Botón CTA -->
         <div class="mt-4 md:mt-0">
           <button
-            @click="handleNewTaskClick"
+            @click="handleNewTask"
             class="cta-button">
             <PlusIcon class="w-4 h-4" />
             <span>Nueva</span>
@@ -131,13 +131,11 @@
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import {
-  Bars3Icon,
-  ClipboardDocumentListIcon,
+  PlusIcon,
   CheckCircleIcon,
-  ChartBarIcon,
   Cog6ToothIcon,
-  CalendarIcon,
-  PlusIcon
+  Bars3Icon,
+  XMarkIcon
 } from '@heroicons/vue/24/outline'
 import { useNewTaskModal } from '@/composables/useNewTaskModal'
 
@@ -148,22 +146,24 @@ const { openModal } = useNewTaskModal()
 // Estado reactivo
 const isMobileMenuOpen = ref(false)
 
-// Métodos
-const toggleMobileMenu = () => {
-  isMobileMenuOpen.value = !isMobileMenuOpen.value
+// Método para nueva tarea
+const handleNewTask = () => {
+  console.log('🆕 NavBar - Activando modal global para nueva tarea')
+  console.log('🔧 NavBar - Ruta actual:', route.path)
+  openModal()
+}
+
+// Métodos para navegación
+const isActiveRoute = (routePath) => {
+  return route.path === routePath
 }
 
 const closeMobileMenu = () => {
   isMobileMenuOpen.value = false
 }
 
-const isActiveRoute = (path) => {
-  return route.path === path
-}
-
-const handleNewTaskClick = () => {
-  openModal()
-  closeMobileMenu()
+const toggleMobileMenu = () => {
+  isMobileMenuOpen.value = !isMobileMenuOpen.value
 }
 </script>
 

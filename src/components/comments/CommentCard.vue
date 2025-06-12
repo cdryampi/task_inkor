@@ -13,7 +13,7 @@
           <span class="font-medium" :class="getAuthorClass()">
             {{ comment.author }}
           </span>
-          <span v-if="comment.type === 'ai'" class="ai-badge">
+          <span v-if="comment.type === 'assistant'" class="ai-badge">
             <SparklesIcon class="w-3 h-3" />
             AI
           </span>
@@ -37,11 +37,11 @@
           :title="copied ? 'Copiado!' : 'Copiar contenido'">
           <component :is="copied ? 'CheckIcon' : 'ClipboardIcon'" class="w-4 h-4" />
         </button>
+        <!-- Botón eliminar para ambos tipos de comentarios -->
         <button
-          v-if="comment.type === 'user'"
           @click="deleteComment"
           class="action-btn delete-btn"
-          title="Eliminar comentario">
+          :title="`Eliminar ${comment.type === 'assistant' ? 'respuesta AI' : 'comentario'}`">
           <TrashIcon class="w-4 h-4" />
         </button>
       </div>
@@ -51,7 +51,7 @@
       <p class="comment-text">{{ comment.content }}</p>
 
       <!-- AI suggestions (if AI comment) -->
-      <div v-if="comment.type === 'ai' && comment.suggestions" class="ai-suggestions">
+      <div v-if="comment.type === 'assistant' && comment.suggestions" class="ai-suggestions">
         <h4 class="suggestions-title">
           <LightBulbIcon class="w-4 h-4" />
           Sugerencias:
@@ -74,7 +74,7 @@
         <span>{{ getReactionCount('helpful') || 'Útil' }}</span>
       </button>
       <button
-        v-if="comment.type === 'ai'"
+        v-if="comment.type === 'assistant'"
         @click="toggleReaction('accurate')"
         class="reaction-btn"
         :class="{ 'active': hasReaction('accurate') }">
@@ -88,6 +88,36 @@
         <HeartIcon class="w-4 h-4" />
         <span>{{ getReactionCount('thanks') || 'Gracias' }}</span>
       </button>
+    </div>
+
+    <!-- Delete confirmation modal (optional for better UX) -->
+    <div v-if="showDeleteConfirm" class="delete-confirm-overlay" @click="showDeleteConfirm = false">
+      <div class="delete-confirm-modal" @click.stop>
+        <div class="delete-confirm-header">
+          <ExclamationTriangleIcon class="w-6 h-6 text-red-500" />
+          <h3 class="text-lg font-semibold text-gray-900">
+            Confirmar eliminación
+          </h3>
+        </div>
+        <p class="text-gray-600 mb-4">
+          ¿Estás seguro de que quieres eliminar {{ comment.type === 'assistant' ? 'esta respuesta de la AI' : 'este comentario' }}?
+          Esta acción no se puede deshacer.
+        </p>
+        <div class="flex space-x-3 justify-end">
+          <button
+            @click="showDeleteConfirm = false"
+            class="px-4 py-2 text-gray-500 hover:text-gray-700 transition-colors">
+            Cancelar
+          </button>
+          <button
+            @click="confirmDelete"
+            :disabled="deleting"
+            class="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 disabled:opacity-50 transition-colors">
+            <span v-if="deleting">Eliminando...</span>
+            <span v-else>Eliminar</span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -103,7 +133,8 @@ import {
   LightBulbIcon,
   HandThumbUpIcon,
   HeartIcon,
-  CheckBadgeIcon
+  CheckBadgeIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/vue/24/outline'
 import {
   SparklesIcon as SparklesIconSolid,
@@ -119,30 +150,32 @@ const props = defineProps({
 })
 
 // Emits
-const emit = defineEmits(['delete', 'ask-ai'])
+const emit = defineEmits(['delete', 'ask-ai', 'update-feedback'])
 
 // State
 const copied = ref(false)
 const reactions = ref(props.comment.reactions || {})
+const showDeleteConfirm = ref(false)
+const deleting = ref(false)
 
 // Computed
 const commentTypeClass = computed(() => {
-  return props.comment.type === 'ai' ? 'ai-comment' : 'user-comment'
+  return props.comment.type === 'assistant' ? 'ai-comment' : 'user-comment'
 })
 
 // Methods
 const getAvatarIcon = () => {
-  return props.comment.type === 'ai' ? SparklesIconSolid : UserIconSolid
+  return props.comment.type === 'assistant' ? SparklesIconSolid : UserIconSolid
 }
 
 const getAvatarIconClass = () => {
-  return props.comment.type === 'ai'
+  return props.comment.type === 'assistant'
     ? 'text-purple-600'
     : 'text-blue-600'
 }
 
 const getAuthorClass = () => {
-  return props.comment.type === 'ai'
+  return props.comment.type === 'assistant'
     ? 'text-purple-800'
     : 'text-blue-800'
 }
@@ -177,7 +210,19 @@ const copyContent = async () => {
 }
 
 const deleteComment = () => {
-  emit('delete', props.comment.id)
+  showDeleteConfirm.value = true
+}
+
+const confirmDelete = async () => {
+  deleting.value = true
+  try {
+    await emit('delete', props.comment.id)
+    showDeleteConfirm.value = false
+  } catch (err) {
+    console.error('Error eliminando comentario:', err)
+  } finally {
+    deleting.value = false
+  }
 }
 
 const askAI = () => {
@@ -185,23 +230,27 @@ const askAI = () => {
 }
 
 const toggleReaction = (type) => {
+  const hasReacted = hasReaction(type)
+  const newValue = !hasReacted
+
+  // Update local state immediately for better UX
   if (!reactions.value[type]) {
     reactions.value[type] = 0
   }
 
-  const hasReacted = hasReaction(type)
   if (hasReacted) {
     reactions.value[type] = Math.max(0, reactions.value[type] - 1)
   } else {
     reactions.value[type] = (reactions.value[type] || 0) + 1
   }
 
-  // TODO: Save reactions to database
+  // Emit to parent for Supabase update
+  emit('update-feedback', props.comment.id, type, newValue)
 }
 
 const hasReaction = (type) => {
-  // TODO: Check if current user has reacted
-  return false // Placeholder
+  // Check if current user has reacted (simplified - should check user state)
+  return (reactions.value[type] || 0) > 0
 }
 
 const getReactionCount = (type) => {
@@ -428,6 +477,47 @@ const getReactionCount = (type) => {
   background: #dbeafe;
   border-color: #3b82f6;
   color: #1d4ed8;
+}
+
+.delete-confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.delete-confirm-modal {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.delete-confirm-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.delete-btn:hover {
+  background: #fef2f2;
+  color: #ef4444;
+  transform: scale(1.05);
+}
+
+/* Better visual feedback for delete actions */
+.comment-card.deleting {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 /* Responsive */

@@ -4,6 +4,12 @@ import { supabase } from '@/lib/supabaseClient'
 const conversations = ref([])
 const loading = ref(false)
 const error = ref(null)
+const conversationStats = ref({
+  userMessages: 0,
+  assistantMessages: 0,
+  totalTokensUsed: 0,
+  usefulMessages: 0
+})
 
 export const useConversationsCRUD = () => {
 
@@ -13,16 +19,25 @@ export const useConversationsCRUD = () => {
     error.value = null
 
     try {
-      const { data, error: supabaseError } = await supabase
-        .from('Conversation')
+      console.log('💬 useConversationsCRUD - Creando conversación:', conversationData)
+
+      // ✅ VALIDAR QUE task_id ESTÁ PRESENTE
+      if (!conversationData.task_id) {
+        throw new Error('task_id es requerido')
+      }
+
+      const { data, error: insertError } = await supabase
+        .from('conversation')
         .insert([conversationData])
         .select()
-        .single()
 
-      if (supabaseError) throw supabaseError
+      if (insertError) {
+        console.error('❌ useConversationsCRUD - Error creando conversación:', insertError)
+        throw insertError
+      }
 
-      conversations.value.push(data)
-      return data
+      console.log('✅ useConversationsCRUD - Conversación creada:', data[0])
+      return data[0]
 
     } catch (err) {
       error.value = err.message
@@ -34,54 +49,70 @@ export const useConversationsCRUD = () => {
   }
 
   // **READ** - Obtener conversaciones
-  const getConversations = async (filters = {}) => {
+  const getConversations = async (taskId) => {
     loading.value = true
     error.value = null
 
     try {
-      let query = supabase
-        .from('Conversation')
-        .select(`
-          *,
-          Task (
-            id,
-            title,
-            description,
-            status,
-            priority
-          )
-        `)
+      console.log('🔄 useConversationsCRUD - Obteniendo conversaciones para tarea:', taskId)
 
-      // Aplicar filtros
-      if (filters.taskId) {
-        query = query.eq('task_id', filters.taskId)
+      if (!taskId) {
+        throw new Error('Task ID es requerido')
       }
 
-      if (filters.role) {
-        query = query.eq('role', filters.role)
+      // ✅ FILTRAR ESPECÍFICAMENTE POR task_id
+      const { data, error: fetchError } = await supabase
+        .from('conversation')
+        .select('*')
+        .eq('task_id', taskId) // ✅ FILTRO ESPECÍFICO
+        .order('created_at', { ascending: true })
+
+      if (fetchError) {
+        console.error('❌ useConversationsCRUD - Error Supabase:', fetchError)
+        throw fetchError
       }
-
-      if (filters.limit) {
-        query = query.limit(filters.limit)
-      }
-
-      // Ordenar por fecha
-      query = query.order('created_at', { ascending: filters.ascending || false })
-
-      const { data, error: supabaseError } = await query
-
-      if (supabaseError) throw supabaseError
 
       conversations.value = data || []
-      return data
+
+      console.log('✅ useConversationsCRUD - Conversaciones obtenidas:', conversations.value.length)
+      console.log('📊 useConversationsCRUD - Conversaciones:', conversations.value.map(c => ({ id: c.id, task_id: c.task_id, role: c.role })))
+
+      // ✅ CALCULAR STATS
+      calculateStats()
 
     } catch (err) {
+      console.error('❌ useConversationsCRUD - Error:', err)
       error.value = err.message
-      console.error('❌ Error obteniendo conversaciones:', err)
-      throw err
+      conversations.value = []
     } finally {
       loading.value = false
     }
+  }
+
+  // ✅ MÉTODO PARA CALCULAR ESTADÍSTICAS
+  const calculateStats = () => {
+    const stats = {
+      userMessages: 0,
+      assistantMessages: 0,
+      totalTokensUsed: 0,
+      usefulMessages: 0
+    }
+
+    conversations.value.forEach(conv => {
+      if (conv.role === 'user') {
+        stats.userMessages++
+      } else if (conv.role === 'assistant') {
+        stats.assistantMessages++
+        stats.totalTokensUsed += conv.tokens_used || 0
+      }
+
+      if (conv.user_is_useful) {
+        stats.usefulMessages++
+      }
+    })
+
+    conversationStats.value = stats
+    console.log('📊 useConversationsCRUD - Stats calculadas:', stats)
   }
 
   // **UPDATE** - Actualizar conversación
@@ -91,7 +122,7 @@ export const useConversationsCRUD = () => {
 
     try {
       const { data, error: supabaseError } = await supabase
-        .from('Conversation')
+        .from('conversation')
         .update(updates)
         .eq('id', id)
         .select()
@@ -117,26 +148,29 @@ export const useConversationsCRUD = () => {
   }
 
   // **DELETE** - Eliminar conversación
-  const deleteConversation = async (id) => {
+  const deleteConversation = async (conversationId) => {
     loading.value = true
     error.value = null
 
     try {
-      const { error: supabaseError } = await supabase
-        .from('Conversation')
-        .delete()
-        .eq('id', id)
+      const { data, error: rpcError } = await supabase.rpc('motivbot_delete_conversation', {
+        p_conversation_id: conversationId
+      })
 
-      if (supabaseError) throw supabaseError
+      if (rpcError) throw rpcError
+
+      if (!data.success) {
+        throw new Error(data.message)
+      }
 
       // Remover de la lista local
-      conversations.value = conversations.value.filter(conv => conv.id !== id)
+      conversations.value = conversations.value.filter(conv => conv.id !== conversationId)
 
-      return true
-
+      console.log('✅ Conversación eliminada exitosamente')
+      return data
     } catch (err) {
-      error.value = err.message
       console.error('❌ Error eliminando conversación:', err)
+      error.value = err.message
       throw err
     } finally {
       loading.value = false
@@ -271,7 +305,7 @@ export const useConversationsCRUD = () => {
   }
 
   // Computed para estadísticas
-  const conversationStats = computed(() => {
+  const conversationStatsComputed = computed(() => {
     const userMessages = conversations.value.filter(conv => conv.role === 'user')
     const assistantMessages = conversations.value.filter(conv => conv.role === 'assistant')
 
@@ -291,7 +325,7 @@ export const useConversationsCRUD = () => {
     conversations,
     loading,
     error,
-    conversationStats,
+    conversationStats: conversationStatsComputed,
 
     // CRUD Básico
     createConversation,

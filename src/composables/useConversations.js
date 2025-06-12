@@ -14,7 +14,7 @@ export const useConversations = () => {
 
     try {
       const { data, error: supabaseError } = await supabase
-        .from('Conversation')
+        .from('conversation')
         .select('*')
         .eq('task_id', taskId)
         .order('created_at', { ascending: true })
@@ -45,7 +45,7 @@ export const useConversations = () => {
       }
 
       const { data, error: supabaseError } = await supabase
-        .from('Conversation')
+        .from('conversation')
         .insert([messageData])
         .select()
         .single()
@@ -79,7 +79,7 @@ export const useConversations = () => {
       }
 
       const { data, error: supabaseError } = await supabase
-        .from('Conversation')
+        .from('conversation')
         .insert([messageData])
         .select()
         .single()
@@ -101,7 +101,7 @@ export const useConversations = () => {
   const updateMessageFeedback = async (messageId, feedback) => {
     try {
       const { data, error: supabaseError } = await supabase
-        .from('Conversation')
+        .from('conversation')
         .update(feedback)
         .eq('id', messageId)
         .select()
@@ -151,7 +151,7 @@ export const useConversations = () => {
   const deleteConversationsByTask = async (taskId) => {
     try {
       const { error: supabaseError } = await supabase
-        .from('Conversation')
+        .from('conversation')
         .delete()
         .eq('task_id', taskId)
 

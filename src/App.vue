@@ -1,18 +1,54 @@
-<script setup>
-
-import NavBarComponent from './components/custom/NavBarComponent.vue';
-
-</script>
-
 <template>
-  <div class="container mx-auto">
+  <div id="app">
     <NavBarComponent />
+    <router-view />
+
+    <!-- ✅ MODAL GLOBAL FUNCIONAL -->
+    <NewTaskModal
+      :isOpen="isGlobalModalOpen"
+      :loading="creatingTask"
+      @close="closeGlobalModal"
+      @submit="handleCreateTask" />
   </div>
-
-
-
-  <RouterView />
 </template>
+
+<script setup>
+import { ref } from 'vue'
+import NavBarComponent from '@/components/custom/NavBarComponent.vue'
+import NewTaskModal from '@/components/modals/NewTaskModal.vue'
+import { useNewTaskModal } from '@/composables/useNewTaskModal'
+import { useSupabase } from '@/hooks/supabase'
+
+// Estado global del modal
+const { isModalOpen: isGlobalModalOpen, closeModal } = useNewTaskModal()
+
+// Hook de Supabase para crear tareas
+const { createTask } = useSupabase()
+
+// Estado para loading
+const creatingTask = ref(false)
+
+// Método para cerrar modal
+const closeGlobalModal = () => {
+  console.log('🔄 App.vue - Cerrando modal global')
+  closeModal()
+}
+
+// Método para crear tarea desde navbar
+const handleCreateTask = async (taskData) => {
+  creatingTask.value = true
+  try {
+    console.log('🚀 App.vue - Creando tarea desde navbar:', taskData)
+    await createTask(taskData)
+    closeGlobalModal()
+    console.log('✅ App.vue - Tarea creada exitosamente desde navbar')
+  } catch (err) {
+    console.error('❌ App.vue - Error creando tarea desde navbar:', err)
+  } finally {
+    creatingTask.value = false
+  }
+}
+</script>
 
 <style scoped>
 header {
@@ -76,4 +112,17 @@ nav a:first-of-type {
     margin-top: 1rem;
   }
 }
+</style>
+
+<style>
+  /* ✅ FORZAR ESTILOS DEL MODAL */
+  [style*="z-index: 99999"] {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    display: flex !important;
+    z-index: 99999 !important;
+  }
 </style>

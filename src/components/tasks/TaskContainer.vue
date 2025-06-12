@@ -3,13 +3,7 @@
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-2xl font-bold text-primary-800">Mis Tareas</h1>
-      <button
-        v-if="showLocalButton"
-        @click="openModal"
-        class="flex items-center space-x-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors font-semibold shadow-sm">
-        <PlusCircleIcon class="w-5 h-5" />
-        <span>Nueva Tarea</span>
-      </button>
+      <!-- ✅ QUITAR BOTÓN NUEVA TAREA - Solo disponible desde navbar -->
     </div>
 
     <!-- Loading state -->
@@ -68,7 +62,7 @@
         v-for="task in allTasks"
         :key="task.id"
         :task="formatTaskForCard(task)"
-        @edit-task="handleEditTask"
+        @update-task="handleUpdateTask"
         @delete-task="handleDeleteTask"
         @update-status="handleUpdateStatus"
       />
@@ -78,22 +72,10 @@
     <div v-if="!loading && allTasks.length === 0" class="text-center py-12">
       <ClipboardDocumentListIcon class="w-16 h-16 text-gray-400 mx-auto mb-4" />
       <p class="text-gray-500 mb-4">No tienes tareas</p>
-      <button
-        @click="openModal"
-        class="inline-flex items-center space-x-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors">
-        <PlusCircleIcon class="w-5 h-5" />
-        <span>Crear tu primera tarea</span>
-      </button>
+      <p class="text-sm text-gray-400">
+        Crea tu primera tarea usando el botón "Nueva" en la barra de navegación
+      </p>
     </div>
-
-    <!-- Modal de nueva/editar tarea -->
-    <NewTaskModal
-      :isOpen="isModalOpen"
-      :loading="creatingTask"
-      :editTask="editingTask"
-      @close="handleCloseModal"
-      @submit="handleCreateTask"
-      @update="handleUpdateTask" />
   </div>
 </template>
 
@@ -102,48 +84,30 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   ClipboardDocumentListIcon,
-  PlusCircleIcon,
   ClockIcon,
   CheckCircleIcon
 } from '@heroicons/vue/24/outline'
 import { useSupabase } from '@/hooks/supabase'
-import { useNewTaskModal } from '@/composables/useNewTaskModal'
-import NewTaskModal from '@/components/modals/NewTaskModal.vue'
 import TaskCard from '@/components/tasks/TaskCard.vue'
 
 const route = useRoute()
 const {
   tasks,
-  pendingTasks,
-  completedTasks,
   loading,
   error,
   getTasks,
-  createTask,
   updateTask,
   toggleTaskStatus,
   deleteTask
 } = useSupabase()
 
-const { isModalOpen, openModal, closeModal } = useNewTaskModal()
-
-// Solo mostrar botón local en ciertas páginas
-const showLocalButton = computed(() => {
-  return route.path === '/mis-tareas' && allTasks.value.length === 0
-})
-
-const creatingTask = ref(false)
-const editingTask = ref(null) // Nueva ref para la tarea en edición
-
 // Computadas para los contadores
 const allTasks = computed(() => {
   return tasks.value.sort((a, b) => {
-    // Ordenar por estado (pendientes primero) y luego por prioridad
     if (a.status !== b.status) {
       const statusOrder = { 'pending': 0, 'in-progress': 1, 'completed': 2 }
       return statusOrder[a.status] - statusOrder[b.status]
     }
-
     const priorityOrder = { high: 3, medium: 2, normal: 1 }
     return (priorityOrder[b.priority] || 1) - (priorityOrder[a.priority] || 1)
   })
@@ -161,7 +125,7 @@ const completedTasksCount = computed(() => {
   return tasks.value.filter(task => task.status === 'completed').length
 })
 
-// Formatear tarea para el TaskCard (incluyendo hora)
+// Formatear tarea para el TaskCard
 const formatTaskForCard = (task) => {
   return {
     id: task.id,
@@ -170,62 +134,22 @@ const formatTaskForCard = (task) => {
     status: task.status,
     priority: task.priority || 'normal',
     dueDate: task.due_date,
-    dueTime: task.due_time, // Añadimos la hora
+    dueTime: task.due_time,
     tags: task.tags || []
   }
 }
 
-// Handle edit task
-const handleEditTask = (task) => {
-  console.log('Editar tarea:', task)
-  editingTask.value = task
-  openModal()
-}
-
-// Handle create task
-const handleCreateTask = async (taskData) => {
-  creatingTask.value = true
-  try {
-    await createTask(taskData)
-    closeModal()
-    console.log('✅ Tarea creada exitosamente')
-  } catch (err) {
-    console.error('❌ Error creando tarea:', err)
-  } finally {
-    creatingTask.value = false
-    editingTask.value = null
-  }
-}
-
-// Handle update task
-const handleUpdateTask = async (taskData) => {
-  creatingTask.value = true
-  try {
-    await updateTask(taskData.id, taskData)
-    closeModal()
-    console.log('✅ Tarea actualizada exitosamente')
-  } catch (err) {
-    console.error('❌ Error actualizando tarea:', err)
-  } finally {
-    creatingTask.value = false
-    editingTask.value = null
-  }
-}
-
-// Handle close modal
-const handleCloseModal = () => {
-  editingTask.value = null
-  closeModal()
-}
+// ✅ QUITAR handleEditTask - Ahora TaskCard maneja la navegación internamente
 
 // Handle delete task
 const handleDeleteTask = async (taskId) => {
   if (confirm('¿Estás seguro de que quieres eliminar esta tarea?')) {
     try {
+      console.log('🗑️ TaskContainer - Eliminando tarea:', taskId)
       await deleteTask(taskId)
-      console.log('✅ Tarea eliminada exitosamente')
+      console.log('✅ TaskContainer - Tarea eliminada exitosamente')
     } catch (err) {
-      console.error('❌ Error eliminando tarea:', err)
+      console.error('❌ TaskContainer - Error eliminando tarea:', err)
     }
   }
 }
@@ -233,15 +157,28 @@ const handleDeleteTask = async (taskId) => {
 // Handle update status
 const handleUpdateStatus = async (taskId, newStatus) => {
   try {
+    console.log('🔄 TaskContainer - Actualizando estado:', taskId, newStatus)
     await toggleTaskStatus(taskId, newStatus)
-    console.log('✅ Estado actualizado exitosamente')
+    console.log('✅ TaskContainer - Estado actualizado exitosamente')
   } catch (err) {
-    console.error('❌ Error actualizando estado:', err)
+    console.error('❌ TaskContainer - Error actualizando estado:', err)
   }
 }
 
-// Cargar tareas al montar el componente
+// ✅ NUEVO: Manejar actualización de tarea desde TaskCard
+const handleUpdateTask = async (taskData) => {
+  try {
+    console.log('🔄 TaskContainer - Actualizando tarea desde TaskCard:', taskData)
+    await updateTask(taskData.id, taskData)
+    console.log('✅ TaskContainer - Tarea actualizada exitosamente')
+  } catch (err) {
+    console.error('❌ TaskContainer - Error actualizando tarea:', err)
+  }
+}
+
+// Cargar tareas al montar
 onMounted(async () => {
+  console.log('🔄 TaskContainer - Cargando tareas')
   await getTasks()
 })
 </script>

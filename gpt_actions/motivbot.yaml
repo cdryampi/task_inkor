@@ -1,22 +1,22 @@
 openapi: 3.1.0
 info:
   title: MotivBot API
-  description: A complete motivational bot for comprehensive task and conversation management
-  version: 2.1.0
+  description: Complete motivational bot for task and conversation management with dynamic schema adaptation
+  version: 2.2.0
   contact:
     name: MotivBot Team
     url: https://yampi.eu
 
 servers:
   - url: https://task-inkor-motivbot.vercel.app/api/supabase
-    description: MotivBot Supabase Direct - Complete RPC Functions
+    description: MotivBot Production Server
 
 paths:
-  # GESTIÓN COMPLETA DE TAREAS
+  # TASK MANAGEMENT
   /rpc/motivbot_get_tasks:
     post:
-      summary: Get tasks with advanced filters
-      description: List tasks with comprehensive filtering options
+      summary: Get tasks with filters
+      description: Retrieve tasks with status, priority, and limit filters. Supports dynamic schema adaptation.
       operationId: motivbotGetTasks
       requestBody:
         required: false
@@ -27,7 +27,7 @@ paths:
               properties:
                 p_status:
                   type: string
-                  enum: [pending, completed]
+                  enum: [pending, in-progress, on-hold, completed, cancelled]
                   nullable: true
                   description: Filter by task status
                 p_priority:
@@ -40,7 +40,11 @@ paths:
                   default: 50
                   minimum: 1
                   maximum: 100
-                  description: Maximum number of tasks to return
+                  description: Maximum tasks to return
+              example:
+                p_status: "pending"
+                p_priority: "high"
+                p_limit: 20
       responses:
         '200':
           description: Tasks retrieved successfully
@@ -50,13 +54,17 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/CompleteTask'
+        '400':
+          description: Bad request
+        '500':
+          description: Server error
       tags:
         - Tasks
 
   /rpc/motivbot_create_task:
     post:
-      summary: Create comprehensive task
-      description: Creates a task with all available fields
+      summary: Create new task
+      description: Create task with title (required) and optional description, priority, due date/time.
       operationId: motivbotCreateTask
       requestBody:
         required: true
@@ -68,28 +76,40 @@ paths:
                 p_title:
                   type: string
                   maxLength: 255
+                  minLength: 1
                   description: Task title (required)
+                  example: "Complete API documentation"
                 p_description:
                   type: string
                   nullable: true
-                  description: Task description (optional)
+                  maxLength: 1000
+                  description: Task description
+                  example: "Write comprehensive API docs"
                 p_priority:
                   type: string
                   enum: [low, normal, medium, high]
-                  default: normal
+                  default: "normal"
                   description: Task priority
+                  example: "high"
                 p_due_date:
                   type: string
                   format: date
                   nullable: true
                   description: Due date (YYYY-MM-DD)
+                  example: "2024-01-15"
                 p_due_time:
                   type: string
                   format: time
                   nullable: true
                   description: Due time (HH:MM:SS)
+                  example: "14:30:00"
               required:
                 - p_title
+              example:
+                p_title: "Complete API documentation"
+                p_description: "Write comprehensive API docs"
+                p_priority: "high"
+                p_due_date: "2024-01-15"
       responses:
         '200':
           description: Task created successfully
@@ -97,13 +117,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CreateResponse'
+        '400':
+          description: Invalid input
+        '500':
+          description: Server error
       tags:
         - Tasks
 
   /rpc/motivbot_update_task:
     post:
-      summary: Update task comprehensively
-      description: Updates any field of an existing task
+      summary: Update existing task
+      description: Update any field of an existing task. Only provided fields will be updated.
       operationId: motivbotUpdateTask
       requestBody:
         required: true
@@ -116,36 +140,48 @@ paths:
                   type: integer
                   minimum: 1
                   description: Task ID to update
+                  example: 1
                 p_title:
                   type: string
                   nullable: true
+                  maxLength: 255
                   description: New task title
+                  example: "Updated task title"
                 p_description:
                   type: string
                   nullable: true
+                  maxLength: 1000
                   description: New task description
+                  example: "Updated description"
                 p_status:
                   type: string
-                  enum: [pending, completed]
+                  enum: [pending, in-progress, on-hold, completed, cancelled]
                   nullable: true
                   description: New task status
+                  example: "completed"
                 p_priority:
                   type: string
                   enum: [low, normal, medium, high]
                   nullable: true
                   description: New task priority
+                  example: "normal"
                 p_due_date:
                   type: string
                   format: date
                   nullable: true
-                  description: New due date (YYYY-MM-DD)
+                  description: New due date
+                  example: "2024-02-01"
                 p_due_time:
                   type: string
                   format: time
                   nullable: true
-                  description: New due time (HH:MM:SS)
+                  description: New due time
+                  example: "16:00:00"
               required:
                 - p_task_id
+              example:
+                p_task_id: 1
+                p_status: "completed"
       responses:
         '200':
           description: Task updated successfully
@@ -153,13 +189,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          description: Task not found
+        '400':
+          description: Invalid input
+        '500':
+          description: Server error
       tags:
         - Tasks
 
   /rpc/motivbot_delete_task:
     post:
       summary: Delete task
-      description: Deletes a task and its conversations
+      description: Permanently delete a task and all associated conversations.
       operationId: motivbotDeleteTask
       requestBody:
         required: true
@@ -172,8 +214,11 @@ paths:
                   type: integer
                   minimum: 1
                   description: Task ID to delete
+                  example: 5
               required:
                 - p_task_id
+              example:
+                p_task_id: 5
       responses:
         '200':
           description: Task deleted successfully
@@ -181,14 +226,69 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          description: Task not found
+        '500':
+          description: Server error
       tags:
         - Tasks
 
-  # GESTIÓN COMPLETA DE CONVERSACIONES
+  /rpc/motivbot_search_tasks:
+    post:
+      summary: Search tasks
+      description: Search tasks by title/description with optional status and priority filters.
+      operationId: motivbotSearchTasks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                p_search:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                  description: Search term for title/description
+                  example: "documentation"
+                p_status:
+                  type: string
+                  enum: [pending, in-progress, on-hold, completed, cancelled]
+                  nullable: true
+                  description: Filter by status
+                  example: "pending"
+                p_priority:
+                  type: string
+                  enum: [low, normal, medium, high]
+                  nullable: true
+                  description: Filter by priority
+                  example: "high"
+              required:
+                - p_search
+              example:
+                p_search: "API"
+                p_status: "pending"
+      responses:
+        '200':
+          description: Search completed successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CompleteTask'
+        '400':
+          description: Invalid search parameters
+        '500':
+          description: Server error
+      tags:
+        - Tasks
+
+  # CONVERSATION MANAGEMENT
   /rpc/motivbot_get_conversations:
     post:
-      summary: Get conversations with filters
-      description: List conversations with comprehensive filtering
+      summary: Get conversations
+      description: Retrieve conversations with task ID, role, and limit filters.
       operationId: motivbotGetConversations
       requestBody:
         required: false
@@ -200,18 +300,25 @@ paths:
                 p_task_id:
                   type: integer
                   nullable: true
+                  minimum: 1
                   description: Filter by specific task
+                  example: 1
                 p_role:
                   type: string
                   enum: [user, assistant]
                   nullable: true
                   description: Filter by message role
+                  example: "user"
                 p_limit:
                   type: integer
                   default: 100
                   minimum: 1
                   maximum: 200
-                  description: Maximum number of conversations to return
+                  description: Maximum conversations to return
+                  example: 50
+              example:
+                p_task_id: 1
+                p_limit: 20
       responses:
         '200':
           description: Conversations retrieved successfully
@@ -221,13 +328,17 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/CompleteConversation'
+        '400':
+          description: Bad request
+        '500':
+          description: Server error
       tags:
         - Conversations
 
   /rpc/motivbot_create_conversation:
     post:
-      summary: Create comprehensive conversation
-      description: Add a new conversation message with metadata
+      summary: Create conversation
+      description: Add new conversation message with role, content, and AI metadata tracking.
       operationId: motivbotCreateConversation
       requestBody:
         required: true
@@ -240,25 +351,37 @@ paths:
                   type: integer
                   minimum: 1
                   description: Task ID
+                  example: 1
                 p_role:
                   type: string
                   enum: [user, assistant]
                   description: Message role
+                  example: "user"
                 p_message:
                   type: string
+                  minLength: 1
+                  maxLength: 5000
                   description: Message content
+                  example: "I need help with this task"
                 p_model_used:
                   type: string
-                  default: gpt-4
+                  default: "gpt-4"
                   description: AI model used
+                  example: "gpt-4"
                 p_tokens_used:
                   type: integer
                   default: 0
+                  minimum: 0
                   description: Tokens consumed
+                  example: 150
               required:
                 - p_task_id
                 - p_role
                 - p_message
+              example:
+                p_task_id: 1
+                p_role: "user"
+                p_message: "I need help with this task"
       responses:
         '200':
           description: Conversation created successfully
@@ -266,13 +389,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CreateResponse'
+        '400':
+          description: Invalid input
+        '404':
+          description: Task not found
+        '500':
+          description: Server error
       tags:
         - Conversations
 
   /rpc/motivbot_update_conversation_feedback:
     post:
-      summary: Update conversation feedback
-      description: Add feedback ratings to conversations
+      summary: Update feedback
+      description: Add quality ratings and feedback to conversations for performance tracking.
       operationId: motivbotUpdateConversationFeedback
       requestBody:
         required: true
@@ -285,28 +414,38 @@ paths:
                   type: integer
                   minimum: 1
                   description: Conversation ID to update
+                  example: 15
                 p_user_is_grateful:
                   type: boolean
                   nullable: true
                   description: User expressed gratitude
+                  example: true
                 p_user_is_useful:
                   type: boolean
                   nullable: true
                   description: User found response useful
+                  example: true
                 p_assistant_is_useful:
                   type: boolean
                   nullable: true
                   description: Assistant was helpful
+                  example: true
                 p_assistant_is_precise:
                   type: boolean
                   nullable: true
                   description: Assistant was precise
+                  example: true
                 p_assistant_is_grateful:
                   type: boolean
                   nullable: true
                   description: Assistant expressed gratitude
+                  example: false
               required:
                 - p_conversation_id
+              example:
+                p_conversation_id: 15
+                p_user_is_grateful: true
+                p_user_is_useful: true
       responses:
         '200':
           description: Feedback updated successfully
@@ -314,14 +453,55 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          description: Conversation not found
+        '400':
+          description: Invalid input
+        '500':
+          description: Server error
       tags:
         - Conversations
 
-  # ANÁLISIS COMPLETO
+  /rpc/motivbot_delete_conversation:
+    post:
+      summary: Delete conversation
+      description: Delete specific conversation message permanently.
+      operationId: motivbotDeleteConversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                p_conversation_id:
+                  type: integer
+                  minimum: 1
+                  description: Conversation ID to delete
+                  example: 23
+              required:
+                - p_conversation_id
+              example:
+                p_conversation_id: 23
+      responses:
+        '200':
+          description: Conversation deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          description: Conversation not found
+        '500':
+          description: Server error
+      tags:
+        - Conversations
+
+  # ANALYTICS
   /rpc/motivbot_get_dashboard:
     post:
-      summary: Get comprehensive dashboard
-      description: Complete system statistics and analytics
+      summary: Get dashboard analytics
+      description: Comprehensive system statistics including task metrics, conversation data, completion rates, and user engagement.
       operationId: motivbotGetDashboard
       requestBody:
         required: false
@@ -330,6 +510,7 @@ paths:
             schema:
               type: object
               properties: {}
+              example: {}
       responses:
         '200':
           description: Dashboard retrieved successfully
@@ -337,46 +518,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CompleteDashboard'
-      tags:
-        - Analytics
-
-  /rpc/motivbot_search_tasks:
-    post:
-      summary: Advanced task search
-      description: Search tasks with multiple filters
-      operationId: motivbotSearchTasks
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                p_search:
-                  type: string
-                  minLength: 1
-                  description: Search term
-                p_status:
-                  type: string
-                  enum: [pending, completed]
-                  nullable: true
-                  description: Filter by status
-                p_priority:
-                  type: string
-                  enum: [low, normal, medium, high]
-                  nullable: true
-                  description: Filter by priority
-              required:
-                - p_search
-      responses:
-        '200':
-          description: Search completed successfully
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/CompleteTask'
+        '500':
+          description: Server error
       tags:
         - Analytics
 
@@ -400,9 +543,9 @@ components:
           example: "Finish GPT Actions integration"
         status:
           type: string
-          enum: [pending, completed]
+          enum: [pending, in-progress, on-hold, completed, cancelled]
           description: Task status
-          example: "pending"
+          example: "in-progress"
         priority:
           type: string
           enum: [low, normal, medium, high]
@@ -423,13 +566,15 @@ components:
         created_at:
           type: string
           format: date-time
-          description: Creation date
+          nullable: true
+          description: Creation timestamp
           example: "2024-01-01T10:00:00Z"
         updated_at:
           type: string
           format: date-time
-          description: Last update date
-          example: "2024-01-01T10:00:00Z"
+          nullable: true
+          description: Last update timestamp
+          example: "2024-01-01T12:00:00Z"
 
     CompleteConversation:
       type: object
@@ -455,7 +600,7 @@ components:
           type: boolean
           nullable: true
           description: User expressed gratitude
-          example: false
+          example: true
         user_is_useful:
           type: boolean
           nullable: true
@@ -486,13 +631,15 @@ components:
           example: "gpt-4"
         response_time_ms:
           type: integer
+          nullable: true
           description: Response time in milliseconds
           example: 2500
         created_at:
           type: string
           format: date-time
-          description: Creation date
-          example: "2024-01-01T10:00:00Z"
+          nullable: true
+          description: Message timestamp
+          example: "2024-01-01T10:30:00Z"
 
     CompleteDashboard:
       type: object
@@ -503,51 +650,67 @@ components:
             total:
               type: integer
               description: Total tasks
-              example: 25
+              example: 45
             pending:
               type: integer
               description: Pending tasks
-              example: 15
+              example: 12
+            in_progress:
+              type: integer
+              description: In-progress tasks
+              example: 8
+            on_hold:
+              type: integer
+              description: On-hold tasks
+              example: 3
             completed:
               type: integer
               description: Completed tasks
-              example: 10
+              example: 20
+            cancelled:
+              type: integer
+              description: Cancelled tasks
+              example: 2
             high_priority:
               type: integer
               description: High priority tasks
-              example: 5
+              example: 7
             overdue:
               type: integer
               description: Overdue tasks
-              example: 2
+              example: 4
         conversations:
           type: object
           properties:
             total:
               type: integer
               description: Total conversations
-              example: 150
+              example: 234
             user_messages:
               type: integer
               description: Messages from users
-              example: 75
+              example: 117
             assistant_messages:
               type: integer
               description: Messages from assistant
-              example: 75
+              example: 117
             total_tokens:
               type: integer
               description: Total tokens used
-              example: 15000
+              example: 34500
             grateful_responses:
               type: integer
               description: Grateful user responses
-              example: 20
+              example: 89
         completion_rate:
           type: number
           format: float
           description: Task completion percentage
-          example: 40.0
+          example: 44.44
+        active_tasks:
+          type: integer
+          description: Active tasks count
+          example: 23
 
     CreateResponse:
       type: object
@@ -559,11 +722,15 @@ components:
         id:
           type: integer
           description: Created item ID
-          example: 1
+          example: 42
         message:
           type: string
           description: Success message
           example: "Task created successfully"
+      required:
+        - success
+        - id
+        - message
 
     SuccessResponse:
       type: object
@@ -576,11 +743,14 @@ components:
           type: string
           description: Response message
           example: "Task updated successfully"
+      required:
+        - success
+        - message
 
 tags:
   - name: Tasks
-    description: Comprehensive task management
+    description: Complete task management with CRUD operations
   - name: Conversations
-    description: Complete conversation handling with feedback
+    description: Full conversation handling with feedback system
   - name: Analytics
-    description: Advanced analytics and search capabilities
+    description: System analytics and search capabilities

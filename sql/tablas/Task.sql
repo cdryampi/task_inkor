@@ -90,3 +90,35 @@ INSERT INTO task (title, description, status, due_date, due_time, priority) VALU
 ('Revisar código', 'Pull request del proyecto X', 'pending', CURRENT_DATE + INTERVAL '1 day', '14:30:00', 'medium'),
 ('Completar documentación', 'Actualizar README del proyecto', 'pending', CURRENT_DATE + INTERVAL '2 days', '16:00:00', 'normal'),
 ('Llamada con cliente', 'Seguimiento del proyecto', 'completed', CURRENT_DATE - INTERVAL '1 day', '11:00:00', 'high');
+
+-- Agregar más valores al ENUM task_status
+ALTER TYPE task_status ADD VALUE IF NOT EXISTS 'in-progress';
+ALTER TYPE task_status ADD VALUE IF NOT EXISTS 'on-hold';
+ALTER TYPE task_status ADD VALUE IF NOT EXISTS 'cancelled';
+
+-- Verificar los valores actuales del ENUM
+SELECT enumlabel FROM pg_enum WHERE enumtypid = (
+    SELECT oid FROM pg_type WHERE typname = 'task_status'
+) ORDER BY enumsortorder;
+
+-- Agregar columnas faltantes a la tabla task si no existen
+ALTER TABLE public.task 
+ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+
+ALTER TABLE public.task 
+ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+
+-- Crear trigger para actualizar updated_at automáticamente
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+DROP TRIGGER IF EXISTS update_task_updated_at ON public.task;
+CREATE TRIGGER update_task_updated_at
+    BEFORE UPDATE ON public.task
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();

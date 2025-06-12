@@ -363,3 +363,32 @@ BEGIN
     RETURN result;
 END;
 $$;
+
+-- Agregar columnas faltantes a la tabla conversation si no existen
+ALTER TABLE public.conversation 
+ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+
+ALTER TABLE public.conversation 
+ADD COLUMN IF NOT EXISTS response_time_ms INTEGER DEFAULT 0;
+
+-- Verificar que todas las columnas existan
+ALTER TABLE public.conversation 
+ADD COLUMN IF NOT EXISTS user_is_grateful BOOLEAN DEFAULT NULL;
+
+ALTER TABLE public.conversation 
+ADD COLUMN IF NOT EXISTS user_is_useful BOOLEAN DEFAULT NULL;
+
+ALTER TABLE public.conversation 
+ADD COLUMN IF NOT EXISTS assistant_is_useful BOOLEAN DEFAULT NULL;
+
+ALTER TABLE public.conversation 
+ADD COLUMN IF NOT EXISTS assistant_is_precise BOOLEAN DEFAULT NULL;
+
+ALTER TABLE public.conversation 
+ADD COLUMN IF NOT EXISTS assistant_is_grateful BOOLEAN DEFAULT NULL;
+
+ALTER TABLE public.conversation 
+ADD COLUMN IF NOT EXISTS tokens_used INTEGER DEFAULT 0;
+
+ALTER TABLE public.conversation 
+ADD COLUMN IF NOT EXISTS model_used TEXT DEFAULT 'gpt-4';

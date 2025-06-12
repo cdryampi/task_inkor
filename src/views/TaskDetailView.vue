@@ -79,7 +79,9 @@
               class="text-sm border-0 border-b border-gray-300 focus:border-primary-500 focus:ring-0 bg-transparent px-0 py-1">
               <option value="pending">Pendiente</option>
               <option value="in-progress">En Progreso</option>
+              <option value="on-hold">En Pausa</option>
               <option value="completed">Completada</option>
+              <option value="cancelled">Cancelada</option>
             </select>
             <div class="text-xs text-gray-400">
               Creada {{ formatRelativeDate(task.created_at) }}
@@ -113,9 +115,9 @@
             <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center justify-between">
               <div class="flex items-center space-x-2">
                 <ChatBubbleLeftRightIcon class="w-5 h-5 text-gray-400" />
-                <span>Comentarios</span>
+                <span>Conversaciones</span>
                 <span class="bg-gray-100 text-gray-500 px-2 py-1 rounded-full text-xs">
-                  {{ comments.length }}
+                  {{ conversations.length }}
                 </span>
               </div>
               <button
@@ -125,6 +127,12 @@
                 <span>Agregar</span>
               </button>
             </h2>
+
+            <!-- Loading conversations -->
+            <div v-if="conversationsLoading" class="text-center py-4">
+              <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500"></div>
+              <p class="mt-2 text-sm text-gray-500">Cargando conversaciones...</p>
+            </div>
 
             <!-- Add Comment Form -->
             <div v-show="showAddComment" class="mb-6 p-4 bg-gray-50 rounded-lg">
@@ -156,16 +164,17 @@
             <!-- Comments List -->
             <div class="space-y-4">
               <CommentCard
-                v-for="comment in comments"
+                v-for="comment in formattedConversations"
                 :key="comment.id"
                 :comment="comment"
                 @delete="deleteComment"
-                @ask-ai="askAI" />
+                @ask-ai="askAI"
+                @update-feedback="updateConversationFeedback" />
 
               <!-- Empty State -->
-              <div v-if="comments.length === 0" class="text-center py-8">
+              <div v-if="conversations.length === 0 && !conversationsLoading" class="text-center py-8">
                 <ChatBubbleLeftRightIcon class="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p class="text-gray-500 text-sm">No hay comentarios aún</p>
+                <p class="text-gray-500 text-sm">No hay conversaciones aún</p>
                 <p class="text-gray-400 text-xs">¡Sé el primero en comentar!</p>
               </div>
             </div>
@@ -262,15 +271,23 @@
               <div class="grid grid-cols-2 gap-4 pt-2">
                 <div class="text-center">
                   <div class="text-2xl font-bold text-gray-600">
-                    {{ comments.filter(c => c.type === 'user').length }}
+                    {{ conversationStats.userMessages }}
                   </div>
                   <div class="text-xs text-gray-400">Comentarios</div>
                 </div>
                 <div class="text-center">
                   <div class="text-2xl font-bold text-gray-600">
-                    {{ comments.filter(c => c.type === 'ai').length }}
+                    {{ conversationStats.assistantMessages }}
                   </div>
                   <div class="text-xs text-gray-400">Respuestas AI</div>
+                </div>
+              </div>
+
+              <!-- Conversation Stats -->
+              <div class="pt-2 border-t border-gray-100">
+                <div class="grid grid-cols-2 gap-2 text-xs text-gray-500">
+                  <div>Tokens: {{ conversationStats.totalTokensUsed }}</div>
+                  <div>Útiles: {{ conversationStats.usefulMessages }}</div>
                 </div>
               </div>
             </div>
@@ -291,7 +308,7 @@
       </button>
     </div>
 
-    <!-- Edit Task Modal -->
+    <!-- Modal de edición con estado local -->
     <NewTaskModal
       :isOpen="isEditModalOpen"
       :loading="updatingTask"
@@ -321,6 +338,7 @@ import {
   PlayIcon,
   ClipboardDocumentListIcon,
   MinusIcon,
+  PauseIcon,
   BoltIcon,
   LightBulbIcon
 } from '@heroicons/vue/24/outline'
@@ -331,6 +349,7 @@ import {
   PlayIcon as PlayIconSolid
 } from '@heroicons/vue/24/solid'
 import { useSupabase } from '@/hooks/supabase'
+import { useConversationsCRUD } from '@/composables/useConversationsCRUD'
 import NewTaskModal from '@/components/modals/NewTaskModal.vue'
 import CommentCard from '@/components/comments/CommentCard.vue'
 
@@ -338,7 +357,20 @@ const route = useRoute()
 const router = useRouter()
 const { getTaskById, updateTask, deleteTask } = useSupabase()
 
-// State
+// Conversations composable
+const {
+  conversations,
+  loading: conversationsLoading,
+  error: conversationsError,
+  conversationStats,
+  getConversations,
+  createConversation,
+  updateConversationFeedback: updateFeedback,
+  deleteConversation,
+  addGPTConversation
+} = useConversationsCRUD()
+
+// Estado completamente local
 const task = ref(null)
 const loading = ref(true)
 const error = ref(null)
@@ -346,153 +378,209 @@ const isEditModalOpen = ref(false)
 const updatingTask = ref(false)
 
 // Comments state
-const comments = ref([])
 const newComment = ref('')
 const showAddComment = ref(false)
 const addingComment = ref(false)
 
-// Methods
-const loadTask = async () => {
-  try {
-    loading.value = true
-    const taskData = await getTaskById(route.params.id)
-    task.value = taskData
+// ✅ DECLARAR VARIABLES FALTANTES
+const taskProgress = ref(0)
+const taskStats = ref({
+  totalComments: 0,
+  userComments: 0,
+  aiComments: 0
+})
 
-    // Load comments (mock data for now)
-    loadComments()
-  } catch (err) {
-    console.error('Error cargando tarea:', err)
-    error.value = 'Error al cargar la tarea'
-  } finally {
-    loading.value = false
-  }
-}
+// Format conversations for CommentCard component
+const formattedConversations = computed(() => {
+  return conversations.value.map(conv => ({
+    id: conv.id,
+    type: conv.role,
+    content: conv.message,
+    created_at: conv.created_at,
+    author: conv.role === 'user' ? 'Usuario' : 'MotivBot',
+    _originalData: conv
+  }))
+})
 
-const loadComments = () => {
-  // Mock comments - replace with real API call
-  comments.value = [
-    {
-      id: 1,
-      type: 'user',
-      content: 'Comenzando a trabajar en esta tarea. Parece compleja pero interesante.',
-      created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      author: 'Usuario'
-    },
-    {
-      id: 2,
-      type: 'ai',
-      content: 'Te sugiero dividir esta tarea en subtareas más pequeñas. Esto te ayudará a mantener el progreso y la motivación. ¿Te gustaría que te ayude a estructurarla?',
-      created_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-      author: 'Asistente AI'
-    }
-  ]
-}
-
-const addComment = async () => {
-  if (!newComment.value.trim()) return
-
-  addingComment.value = true
-
-  try {
-    // Add user comment
-    const userComment = {
-      id: Date.now(),
-      type: 'user',
-      content: newComment.value.trim(),
-      created_at: new Date().toISOString(),
-      author: 'Usuario'
-    }
-
-    comments.value.push(userComment)
-    newComment.value = ''
-    showAddComment.value = false
-
-    // TODO: Save to database
-
-  } catch (err) {
-    console.error('Error agregando comentario:', err)
-  } finally {
-    addingComment.value = false
-  }
-}
-
-const askAI = async (commentContent) => {
-  try {
-    // Mock AI response - replace with real AI API call
-    const aiResponse = {
-      id: Date.now() + 1,
-      type: 'ai',
-      content: `Basándome en tu comentario "${commentContent}", te sugiero lo siguiente: Esta es una excelente observación. Para avanzar de manera efectiva, podrías considerar establecer pequeños hitos intermedios que te permitan evaluar el progreso regularmente.`,
-      created_at: new Date().toISOString(),
-      author: 'Asistente AI'
-    }
-
-    comments.value.push(aiResponse)
-  } catch (err) {
-    console.error('Error obteniendo respuesta de AI:', err)
-  }
-}
-
-const deleteComment = (commentId) => {
-  if (confirm('¿Estás seguro de eliminar este comentario?')) {
-    comments.value = comments.value.filter(c => c.id !== commentId)
-  }
-}
-
+// Métodos locales para el modal
 const openEditModal = () => {
+  console.log('🔧 TaskDetailView - Abriendo modal de edición local')
   isEditModalOpen.value = true
 }
 
 const closeEditModal = () => {
+  console.log('🔧 TaskDetailView - Cerrando modal de edición local')
   isEditModalOpen.value = false
 }
 
-const formatTaskForModal = (task) => {
-  if (!task) return null
+const formatTaskForModal = (taskData) => {
+  if (!taskData) return null
   return {
-    id: task.id,
-    title: task.title,
-    description: task.description,
-    status: task.status,
-    priority: task.priority || 'normal',
-    dueDate: task.due_date,
-    dueTime: task.due_time
+    id: taskData.id,
+    title: taskData.title,
+    description: taskData.description,
+    status: taskData.status,
+    priority: taskData.priority || 'normal',
+    dueDate: taskData.due_date,
+    dueTime: taskData.due_time,
+    // ✅ ASEGURAR QUE INCLUYE EL task_id
+    task_id: taskData.id
   }
 }
 
 const handleUpdateTask = async (taskData) => {
   updatingTask.value = true
   try {
+    console.log('🔄 TaskDetailView - Actualizando tarea:', taskData)
     await updateTask(taskData.id, taskData)
-    // Reload task data
-    await loadTask()
+    await loadTask() // Reload task data
     closeEditModal()
-    console.log('✅ Tarea actualizada exitosamente')
+    console.log('✅ TaskDetailView - Tarea actualizada exitosamente')
   } catch (err) {
-    console.error('❌ Error actualizando tarea:', err)
+    console.error('❌ TaskDetailView - Error actualizando tarea:', err)
   } finally {
     updatingTask.value = false
   }
 }
 
-const updateTaskStatus = async () => {
+// ✅ DECLARAR MÉTODOS FALTANTES
+const loadTask = async () => {
   try {
-    await updateTask(task.value.id, { status: task.value.status })
-    console.log('✅ Estado actualizado exitosamente')
+    console.log('🔄 TaskDetailView - Cargando tarea:', route.params.id)
+    const taskData = await getTaskById(parseInt(route.params.id))
+    task.value = taskData
   } catch (err) {
-    console.error('❌ Error actualizando estado:', err)
+    console.error('❌ TaskDetailView - Error cargando tarea:', err)
+    error.value = 'Error cargando la tarea'
+  } finally {
+    loading.value = false
   }
 }
 
-const deleteTaskHandler = async () => {
-  if (confirm('¿Estás seguro de que quieres eliminar esta tarea? Esta acción no se puede deshacer.')) {
-    try {
-      await deleteTask(task.value.id)
-      router.push('/mis-tareas')
-      console.log('✅ Tarea eliminada exitosamente')
-    } catch (err) {
-      console.error('❌ Error eliminando tarea:', err)
+// ✅ ARREGLAR loadConversations para usar el task_id correcto
+const loadConversations = async () => {
+  try {
+    console.log('🔄 TaskDetailView - Cargando conversaciones para tarea:', route.params.id)
+
+    // ✅ ASEGURAR QUE PASAMOS EL task_id CORRECTO
+    const taskId = parseInt(route.params.id)
+
+    if (!taskId) {
+      console.error('❌ TaskDetailView - Task ID no válido:', route.params.id)
+      return
     }
+
+    await getConversations(taskId)
+    console.log('✅ TaskDetailView - Conversaciones cargadas:', conversations.value.length)
+
+    // ✅ DEBUG: Verificar que las conversaciones son de la tarea correcta
+    conversations.value.forEach(conv => {
+      if (conv.task_id !== taskId) {
+        console.warn('⚠️ Conversación con task_id incorrecto:', conv.task_id, 'esperado:', taskId)
+      }
+    })
+
+  } catch (err) {
+    console.error('❌ TaskDetailView - Error cargando conversaciones:', err)
+  }
+}
+
+// Methods
+const addComment = async () => {
+  if (!newComment.value.trim()) return
+
+  addingComment.value = true
+
+  try {
+    const taskId = parseInt(route.params.id)
+
+    console.log('💬 TaskDetailView - Agregando comentario para tarea:', taskId)
+
+    // ✅ ASEGURAR QUE EL task_id ES CORRECTO
+    await createConversation({
+      task_id: taskId,
+      role: 'user',
+      message: newComment.value.trim(),
+      user_is_grateful: false,
+      user_is_useful: false
+    })
+
+    newComment.value = ''
+    showAddComment.value = false
+
+    // ✅ RELOAD CONVERSATIONS PARA LA TAREA ESPECÍFICA
+    await loadConversations()
+
+    console.log('✅ TaskDetailView - Comentario agregado exitosamente')
+
+  } catch (err) {
+    console.error('❌ TaskDetailView - Error agregando comentario:', err)
+    error.value = 'Error al agregar comentario'
+  } finally {
+    addingComment.value = false
+  }
+}
+
+// ✅ ARREGLAR askAI para usar task_id correcto
+const askAI = async (commentContent) => {
+  try {
+    // Create AI response using RPC function
+    await addGPTConversation(
+      parseInt(route.params.id),
+      'assistant',
+      `Basándome en tu comentario "${commentContent}", te sugiero lo siguiente: Esta es una excelente observación. Para avanzar de manera efectiva, podrías considerar establecer pequeños hitos intermedios que te permitan evaluar el progreso regularmente. ¿Te gustaría que te ayude a estructurar estos pasos? 💡`,
+      {
+        source: 'task_detail_ai_button',
+        modelUsed: 'gpt-4',
+        tokensUsed: 120
+      }
+    )
+
+    // Reload conversations
+    await loadConversations()
+
+  } catch (err) {
+    console.error('Error obteniendo respuesta de AI:', err)
+  }
+}
+
+const deleteComment = async (commentId) => {
+  try {
+    // Use the deleteConversation method from composable
+    await deleteConversation(commentId)
+
+    // Reload conversations to get fresh data
+    await loadConversations()
+
+    console.log('✅ Comentario eliminado exitosamente')
+  } catch (err) {
+    console.error('❌ Error eliminando comentario:', err)
+    error.value = 'Error al eliminar comentario'
+  }
+}
+
+const updateConversationFeedback = async (commentId, feedbackType, value) => {
+  try {
+    const feedback = {}
+
+    // Map feedback types to database fields
+    switch (feedbackType) {
+      case 'helpful':
+        feedback.userIsUseful = value
+        break
+      case 'accurate':
+        feedback.assistantIsPrecise = value
+        break
+      case 'thanks':
+        feedback.userIsGrateful = value
+        break
+    }
+
+    await updateFeedback(commentId, feedback)
+    await loadConversations()
+
+  } catch (err) {
+    console.error('Error actualizando feedback:', err)
   }
 }
 
@@ -526,7 +614,9 @@ const getStatusClass = (status) => {
   switch (status) {
     case 'pending': return 'bg-gray-100 text-gray-700'
     case 'in-progress': return 'bg-blue-100 text-blue-700'
+    case 'on-hold': return 'bg-yellow-100 text-yellow-700'
     case 'completed': return 'bg-green-100 text-green-700'
+    case 'cancelled': return 'bg-red-100 text-red-700'
     default: return 'bg-gray-100 text-gray-700'
   }
 }
@@ -535,7 +625,9 @@ const getStatusIcon = (status) => {
   switch (status) {
     case 'pending': return ClipboardDocumentListIcon
     case 'in-progress': return PlayIcon
+    case 'on-hold': return PauseIcon
     case 'completed': return CheckCircleIcon
+    case 'cancelled': return XCircleIcon
     default: return MinusIcon
   }
 }
@@ -544,7 +636,9 @@ const getStatusLabel = (status) => {
   switch (status) {
     case 'pending': return 'Pendiente'
     case 'in-progress': return 'En Progreso'
+    case 'on-hold': return 'En Pausa'
     case 'completed': return 'Completada'
+    case 'cancelled': return 'Cancelada'
     default: return 'Desconocido'
   }
 }
@@ -622,7 +716,9 @@ const getProgressPercentage = () => {
   switch (task.value.status) {
     case 'pending': return 0
     case 'in-progress': return 50
+    case 'on-hold': return 25
     case 'completed': return 100
+    case 'cancelled': return 0
     default: return 0
   }
 }
@@ -634,9 +730,12 @@ const getProgressBarClass = () => {
   return 'bg-green-500'
 }
 
-// Load task on mount
-onMounted(() => {
-  loadTask()
+// Cargar datos al montar
+onMounted(async () => {
+  await Promise.all([
+    loadTask(),
+    loadConversations()
+  ])
 })
 </script>
 

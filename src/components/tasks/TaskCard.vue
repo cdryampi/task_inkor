@@ -6,7 +6,8 @@
         <button @click="viewTask" class="action-btn view-btn" title="Ver detalles">
           <EyeIcon class="w-4 h-4" />
         </button>
-        <button @click="editTask" class="action-btn edit-btn" title="Editar tarea">
+        <!-- ✅ BOTÓN EDITAR ABRE MODAL -->
+        <button @click="openEditModal" class="action-btn edit-btn" title="Editar tarea">
           <PencilIcon class="w-4 h-4" />
         </button>
         <button @click="deleteTask" class="action-btn delete-btn" title="Eliminar tarea">
@@ -51,7 +52,7 @@
       </div>
     </div>
 
-    <!-- Botón flotante para ver detalles (alternativa más visible) -->
+    <!-- Botón flotante para ver detalles -->
     <button
       @click="viewTask"
       class="view-details-btn"
@@ -59,6 +60,14 @@
       <ArrowTopRightOnSquareIcon class="w-4 h-4" />
       <span class="sr-only">Ver detalles</span>
     </button>
+
+    <!-- ✅ MODAL DE EDICIÓN -->
+    <NewTaskModal
+      :isOpen="isEditModalOpen"
+      :loading="updatingTask"
+      :editTask="formatTaskForModal(task)"
+      @close="closeEditModal"
+      @update="handleUpdateTask" />
   </div>
 </template>
 
@@ -79,6 +88,7 @@ import {
   ExclamationTriangleIcon as ExclamationTriangleIconSolid,
   FireIcon as FireIconSolid
 } from '@heroicons/vue/24/solid'
+import NewTaskModal from '@/components/modals/NewTaskModal.vue'
 
 export default {
   name: 'TaskCard',
@@ -93,12 +103,19 @@ export default {
     EyeIcon,
     ArrowTopRightOnSquareIcon,
     ExclamationTriangleIconSolid,
-    FireIconSolid
+    FireIconSolid,
+    NewTaskModal
   },
   props: {
     task: {
       type: Object,
       required: true
+    }
+  },
+  data() {
+    return {
+      isEditModalOpen: false,
+      updatingTask: false
     }
   },
   setup() {
@@ -111,18 +128,71 @@ export default {
     }
   },
   methods: {
+    // ✅ ABRIR MODAL DE EDICIÓN
+    openEditModal() {
+      console.log('✏️ TaskCard - Abriendo modal de edición:', this.task.id)
+      this.isEditModalOpen = true
+    },
+
+    // ✅ CERRAR MODAL DE EDICIÓN
+    closeEditModal() {
+      console.log('❌ TaskCard - Cerrando modal de edición')
+      this.isEditModalOpen = false
+    },
+
+    // ✅ FORMATEAR TAREA PARA EL MODAL
+    formatTaskForModal(task) {
+      if (!task) return null
+      return {
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        priority: task.priority || 'normal',
+        dueDate: task.dueDate,
+        dueTime: task.dueTime
+      }
+    },
+
+    // ✅ MANEJAR ACTUALIZACIÓN DE TAREA DESDE MODAL
+    async handleUpdateTask(taskData) {
+      this.updatingTask = true
+      try {
+        console.log('🔄 TaskCard - Actualizando tarea:', taskData)
+
+        // Emitir evento al TaskContainer
+        this.$emit('update-task', taskData)
+
+        // Cerrar modal
+        this.closeEditModal()
+
+        console.log('✅ TaskCard - Tarea actualizada exitosamente')
+      } catch (err) {
+        console.error('❌ TaskCard - Error actualizando tarea:', err)
+      } finally {
+        this.updatingTask = false
+      }
+    },
+
+    // ✅ NAVEGAR AL DETALLE
     viewTask() {
-      this.router.push(`/task/${this.task.id}`)
+      console.log('👁️ TaskCard - Navegando a detalle de tarea:', this.task.id)
+      this.router.push(`/tarea/${this.task.id}`)
     },
-    editTask() {
-      this.$emit('edit-task', this.task);
-    },
+
+    // ✅ ELIMINAR TAREA
     deleteTask() {
+      console.log('🗑️ TaskCard - Emitiendo delete-task:', this.task.id)
       this.$emit('delete-task', this.task.id);
     },
+
+    // ✅ ACTUALIZAR ESTADO
     updateStatus() {
+      console.log('🔄 TaskCard - Emitiendo update-status:', this.task.id, this.task.status)
       this.$emit('update-status', this.task.id, this.task.status);
     },
+
+    // ✅ MÉTODOS DE UTILIDAD
     formatDate(date) {
       return new Date(date).toLocaleDateString('es-ES');
     },
@@ -181,7 +251,7 @@ export default {
 
 .task-card:hover .view-details-btn {
   opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
+  transform: translate(0, -50%) scale(1);
 }
 
 .status-pending {
@@ -255,12 +325,11 @@ export default {
   box-shadow: 0 2px 8px rgba(211, 47, 47, 0.2);
 }
 
-/* Botón flotante para ver detalles */
 .view-details-btn {
-  position: relative;
+  position: absolute;
   top: 50%;
-  left: 99%;
-  transform: translate(-50%, -50%) scale(0.8);
+  right: -12px;
+  transform: translate(0, -50%) scale(0.8);
   width: 40px;
   height: 40px;
   background: linear-gradient(135deg, #0ea5e9, #0284c7);
@@ -280,7 +349,7 @@ export default {
 .view-details-btn:hover {
   background: linear-gradient(135deg, #0284c7, #0369a1);
   box-shadow: 0 6px 20px rgba(14, 165, 233, 0.4);
-  transform: translate(-50%, -50%) scale(1.1);
+  transform: translate(0, -50%) scale(1.1);
 }
 
 .task-description {
@@ -419,7 +488,7 @@ export default {
 
   .view-details-btn {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: translate(0, -50%) scale(1);
     position: static;
     transform: none;
     margin-top: 12px;
