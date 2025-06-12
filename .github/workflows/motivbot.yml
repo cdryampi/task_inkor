@@ -1,190 +1,31 @@
-name: MotivBot Comprehensive Tests
+name: MotivBot Tests
 
 on:
   push:
     branches: [ master, main ]
-    paths:
-      - 'test/**'
-      - 'requirements.txt'
-      - '**/*.py'
   pull_request:
     branches: [ master, main ]
-    paths:
-      - 'test/**'
-      - 'requirements.txt'
-      - '**/*.py'
-
-env:
-  PYTHON_VERSION: '3.11'
 
 jobs:
-  # Job 1: Validar setup
-  validate-setup:
-    name: Validate Test Setup
+  test:
+    name: Run Tests
     runs-on: ubuntu-latest
-    environment: motivbot  # 👈 Agregar environment
+    environment: motivbot
     
     steps:
     - uses: actions/checkout@v4
-    
-    - name: Check requirements.txt
-      run: |
-        if [ ! -f requirements.txt ]; then
-          echo "❌ requirements.txt not found"
-          exit 1
-        fi
-        echo "✅ requirements.txt found"
-        
-    - name: Check test files
-      run: |
-        if [ ! -f test/test_motivbot_functions.py ]; then
-          echo "❌ test_motivbot_functions.py not found"
-          exit 1
-        fi
-        echo "✅ test_motivbot_functions.py found"
-
-  # Job 2: Ejecutar tests de MotivBot
-  test-motivbot:
-    name: MotivBot RPC Tests
-    runs-on: ubuntu-latest
-    environment: motivbot
-    needs: validate-setup
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Set up Python ${{ env.PYTHON_VERSION }}
-      uses: actions/setup-python@v4
+    - uses: actions/setup-python@v4
       with:
-        python-version: ${{ env.PYTHON_VERSION }}
+        python-version: '3.11'
         
-    - name: Cache pip dependencies
-      uses: actions/cache@v3
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-          
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
         pip install -r requirements.txt
         
-    - name: Setup test environment
+    - name: Setup environment
       run: |
         echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> .env
         echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env
         
-    - name: Debug environment variables
-      run: |
-        echo "🔍 Checking environment setup..."
-        if [ -f .env ]; then
-          echo "✅ .env file exists"
-          echo "📋 .env file contents (sanitized):"
-          sed 's/=.*/=***HIDDEN***/' .env
-        else
-          echo "❌ .env file not found"
-        fi
-        
-        echo "🔍 Checking if secrets are available..."
-        if [ -z "${{ secrets.VITE_SUPABASE_URL }}" ]; then
-          echo "❌ VITE_SUPABASE_URL secret is empty or not set"
-        else
-          echo "✅ VITE_SUPABASE_URL secret is available"
-        fi
-        
-        if [ -z "${{ secrets.VITE_SUPABASE_ANON_KEY }}" ]; then
-          echo "❌ VITE_SUPABASE_ANON_KEY secret is empty or not set"
-        else
-          echo "✅ VITE_SUPABASE_ANON_KEY secret is available"
-        fi
-        
-    - name: Test environment loading in Python
-      run: |
-        python -c "
-        import os
-        from dotenv import load_dotenv
-        
-        print('🐍 Testing Python environment loading...')
-        load_dotenv()
-        
-        url = os.getenv('VITE_SUPABASE_URL')
-        key = os.getenv('VITE_SUPABASE_ANON_KEY')
-        
-        print(f'URL loaded: {\"✅ Yes\" if url else \"❌ No\"} (length: {len(url) if url else 0})')
-        print(f'Key loaded: {\"✅ Yes\" if key else \"❌ No\"} (length: {len(key) if key else 0})')
-        
-        if url:
-            print(f'URL starts with: {url[:30]}...')
-        if key:
-            print(f'Key starts with: {key[:20]}...')
-        "
-        
-    - name: Run MotivBot function tests
-      run: |
-        echo "🧪 Running MotivBot RPC function tests..."
-        pytest test/test_motivbot_functions.py \
-          -v \
-          --tb=short \
-          --color=yes \
-          --durations=10
-      env:
-        PYTHONPATH: .
-        
-    - name: Run tests with coverage
-      run: |
-        echo "📊 Running tests with coverage..."
-        pytest test/test_motivbot_functions.py \
-          --cov=test \
-          --cov-report=term-missing \
-          --cov-report=xml
-          
-    - name: Generate detailed test report
-      if: always()
-      run: |
-        pytest test/test_motivbot_functions.py \
-          --junitxml=test-results.xml \
-          --html=test-report.html \
-          --self-contained-html
-          
-    - name: Upload test artifacts
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-artifacts
-        path: |
-          test-results.xml
-          test-report.html
-          coverage.xml
-        retention-days: 7
-
-  # Job 3: Resultados y notificación
-  test-summary:
-    name: Test Results Summary
-    runs-on: ubuntu-latest
-    needs: test-motivbot
-    if: always()
-    
-    steps:
-    - name: Success notification
-      if: needs.test-motivbot.result == 'success'
-      run: |
-        echo "✅ All MotivBot tests passed successfully!"
-        echo "🎉 Test suite completed without errors"
-        echo "📊 Coverage reports generated"
-        
-    - name: Failure notification
-      if: needs.test-motivbot.result == 'failure'
-      run: |
-        echo "❌ MotivBot tests failed!"
-        echo "🔍 Check the test results for details"
-        echo "📋 Test artifacts uploaded for review"
-        exit 1
-        
-    - name: Cancelled notification
-      if: needs.test-motivbot.result == 'cancelled'
-      run: |
-        echo "⚠️ MotivBot tests were cancelled"
-        exit 1
+    - name: Run tests
+      run: pytest test/test_motivbot_functions.py -v
