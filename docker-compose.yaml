@@ -1,0 +1,18 @@
+version: '3'
+
+services:
+  tienda-entregable:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    environment:
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+      - OPENIA_API_KEY=${OPENIA_API_KEY}
+      - VITE_PROXY_SERVER=${VITE_PROXY_SERVER}
+      - VITE_USE_PROXY_SERVER=${VITE_USE_PROXY_SERVER}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+      - RATE_LIMIT_REQUESTS_PER_MINUTE=${RATE_LIMIT_REQUESTS_PER_MINUTE}
+    restart: unless-stopped
