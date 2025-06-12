@@ -177,7 +177,7 @@ export default {
     // ✅ NAVEGAR AL DETALLE
     viewTask() {
       console.log('👁️ TaskCard - Navegando a detalle de tarea:', this.task.id)
-      this.router.push(`/tarea/${this.task.id}`)
+      this.router.push(`/task/${this.task.id}`)
     },
 
     // ✅ ELIMINAR TAREA
