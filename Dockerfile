@@ -4,15 +4,21 @@ FROM node:20-alpine AS base
 FROM base AS deps
 WORKDIR /app
 
-# Copy package files (incluir package-lock.json si existe)
+# Copy package files
 COPY package.json package-lock.json* ./
+
+# Debug: Show package.json content
+RUN echo "📋 Package.json found:" && \
+    cat package.json | head -20
+
+# Install production dependencies
 RUN npm ci --only=production --silent
 
-# Rebuild the source code only when needed
+# Build stage
 FROM base AS builder
 WORKDIR /app
 
-# ✅ MOVER LOS ARG AQUÍ donde se usan
+# Build arguments
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
 ARG OPENAI_API_KEY
@@ -21,17 +27,28 @@ ARG VITE_PROXY_SERVER_PORT
 ARG ALLOWED_ORIGINS
 ARG RATE_LIMIT_REQUESTS_PER_MINUTE
 
-# Copy dependencies from deps stage
-COPY --from=deps /app/node_modules ./node_modules
+# Copy source files
+COPY package.json package-lock.json* ./
 COPY . .
 
-# Debug: Verificar que las variables están disponibles
-RUN echo "🔍 Checking build variables:" && \
-    echo "VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:+SET}" && \
-    echo "VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:+SET}" && \
-    echo "OPENAI_API_KEY: ${OPENAI_API_KEY:+SET}"
+# Debug: Check what we have
+RUN echo "🔍 Files in app directory:" && \
+    ls -la && \
+    echo "🔍 Checking if vite.config.js exists:" && \
+    ls -la vite.config.* || echo "No vite config found" && \
+    echo "🔍 Checking package scripts:" && \
+    npm run || echo "No scripts found"
 
-# Create .env file from environment variables at build time
+# Install ALL dependencies (dev + prod for build)
+RUN npm install --silent
+
+# Debug: Verify installations
+RUN echo "📦 Installed packages:" && \
+    npm list --depth=0 || echo "Package list failed" && \
+    echo "🔍 Node modules:" && \
+    ls -la node_modules/ | head -10
+
+# Create .env file
 RUN echo "VITE_SUPABASE_URL=${VITE_SUPABASE_URL}" > .env && \
     echo "VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}" >> .env && \
     echo "OPENAI_API_KEY=${OPENAI_API_KEY}" >> .env && \
@@ -40,32 +57,36 @@ RUN echo "VITE_SUPABASE_URL=${VITE_SUPABASE_URL}" > .env && \
     echo "ALLOWED_ORIGINS=${ALLOWED_ORIGINS}" >> .env && \
     echo "RATE_LIMIT_REQUESTS_PER_MINUTE=${RATE_LIMIT_REQUESTS_PER_MINUTE}" >> .env
 
-# Install ALL dependencies (including devDependencies for build)
-RUN npm install --silent
+# Debug: Show environment
+RUN echo "📋 Environment file:" && \
+    cat .env | sed 's/=.*/=***/'
 
-# Debug: Show .env content (masked)
-RUN echo "📋 Environment file created:" && \
-    cat .env | sed 's/=.*/=***MASKED***/'
+# Try to build with verbose output
+RUN echo "🚀 Starting build process..." && \
+    npm run build --verbose || (echo "❌ Build failed. Showing error details:" && cat package.json && exit 1)
 
-# Build the project
-RUN npm run build
+# Check build output
+RUN echo "📦 Build completed. Contents:" && \
+    ls -la && \
+    if [ -d "dist" ]; then \
+        echo "✅ dist folder found:" && \
+        ls -la dist/; \
+    else \
+        echo "❌ No dist folder. Checking for other build outputs:" && \
+        ls -la build/ || ls -la public/ || echo "No build output found"; \
+    fi
 
-# Debug: Verify build output
-RUN echo "📦 Build completed. Checking dist folder:" && \
-    ls -la dist/ || echo "❌ dist folder not found"
-
-# Production image, copy all the files and run the app
+# Production stage
 FROM nginx:alpine AS runner
-WORKDIR /usr/share/nginx/html
 
-# Copy the built assets from the builder stage
-COPY --from=builder /app/dist .
-
-# Copy custom nginx config
+# Copy nginx config first
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expose port 80
-EXPOSE 80
+# Copy built files
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Start nginx server
+# Set permissions
+RUN chmod -R 755 /usr/share/nginx/html
+
+EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
