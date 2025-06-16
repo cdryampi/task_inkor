@@ -74,6 +74,19 @@ export const useSupabase = () => {
         query = query.eq('due_date', todayStr)
       }
 
+      // ✅ FILTRO POR FECHA ESPECÍFICA
+      if (options.specificDate) {
+        console.log('📅 Filtrando por fecha específica:', options.specificDate)
+        query = query.eq('due_date', options.specificDate)
+      }
+
+      // ✅ FILTRO POR RANGO DE FECHAS
+      if (options.dateRange) {
+        const { start, end } = options.dateRange
+        console.log('📅 Filtrando por rango de fechas:', { start, end })
+        query = query.gte('due_date', start).lte('due_date', end)
+      }
+
       // ✅ LÍMITE DE RESULTADOS
       if (options.limit) {
         console.log('🔢 Aplicando límite:', options.limit)
@@ -82,7 +95,7 @@ export const useSupabase = () => {
 
       // ✅ ORDENAMIENTO (por defecto por fecha de creación)
       const orderBy = options.orderBy || 'created_at'
-      const ascending = options.ascending || false
+      const ascending = options.ascending !== undefined ? options.ascending : false
       query = query.order(orderBy, { ascending })
 
       // ✅ FILTRO POR ESTADO
@@ -102,7 +115,11 @@ export const useSupabase = () => {
         throw new Error(`Supabase Error: ${supabaseError.message}`)
       }
 
-      tasks.value = data || []
+      // Solo actualizar el estado si no es una consulta específica
+      if (!options.specificDate && !options.dateRange) {
+        tasks.value = data || []
+      }
+
       console.log('✅ Tareas cargadas:', data?.length || 0, 'filtros aplicados:', options)
 
       return data || []
@@ -134,6 +151,110 @@ export const useSupabase = () => {
     return await getTasks({
       fromToday: true,
       limit,
+      orderBy: 'due_date',
+      ascending: true
+    })
+  }
+
+  // ✅ MÉTODO ESPECÍFICO PARA TAREAS POR FECHA - ACTUALIZADO
+  const getTasksByDate = async (date, updateMainTasks = false) => {
+    console.log('📅 Obteniendo tareas para fecha específica:', date, 'actualizar main:', updateMainTasks)
+
+    try {
+      // Convertir Date a string YYYY-MM-DD si es necesario
+      let dateStr = date
+      if (date instanceof Date) {
+        dateStr = date.toISOString().split('T')[0]
+      }
+
+      const tasksForDate = await getTasks({
+        specificDate: dateStr,
+        orderBy: 'due_time',
+        ascending: true
+      })
+
+      // ✅ OPCIÓN PARA ACTUALIZAR EL ESTADO PRINCIPAL
+      if (updateMainTasks) {
+        tasks.value = tasksForDate
+        console.log('📝 Estado principal actualizado con tareas del día')
+      }
+
+      return tasksForDate
+    } catch (err) {
+      console.error('❌ Error obteniendo tareas por fecha:', err)
+      throw err
+    }
+  }
+
+  // ✅ NUEVO: MÉTODO PARA OBTENER Y ACTUALIZAR TAREAS POR DÍA
+  const filterTasksByDay = async (date) => {
+    loading.value = true
+    error.value = null
+
+    try {
+      console.log('📅 Filtrando tareas por día:', date)
+
+      const { data, error: queryError } = await supabase
+        .from(tableName.value)
+        .select('*')
+        .eq('due_date', date)
+        .order('due_time', { ascending: true })
+
+      if (queryError) {
+        throw queryError
+      }
+
+      // Actualizar el estado de tareas con las tareas filtradas
+      tasks.value = data || []
+
+      console.log(`✅ Tareas del día ${date} cargadas:`, tasks.value.length)
+      return data
+
+    } catch (err) {
+      console.error('❌ Error filtrando tareas por día:', err)
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // ✅ NUEVO: MÉTODO PARA RESTAURAR TODAS LAS TAREAS
+  const restoreAllTasks = async () => {
+    console.log('🔄 Restaurando todas las tareas')
+    await getTasks()
+  }
+
+  // ✅ MÉTODO PARA TAREAS DE UNA SEMANA ESPECÍFICA
+  const getTasksForWeek = async (startDate) => {
+    console.log('📅 Obteniendo tareas para la semana desde:', startDate)
+
+    const start = new Date(startDate)
+    const end = new Date(start)
+    end.setDate(end.getDate() + 6) // 7 días incluyendo el día inicial
+
+    const startStr = start.toISOString().split('T')[0]
+    const endStr = end.toISOString().split('T')[0]
+
+    return await getTasks({
+      dateRange: { start: startStr, end: endStr },
+      orderBy: 'due_date',
+      ascending: true
+    })
+  }
+
+  // ✅ MÉTODO PARA TAREAS DE UN MES ESPECÍFICO
+  const getTasksForMonth = async (year, month) => {
+    console.log('📅 Obteniendo tareas para mes:', { year, month })
+
+    const startDate = new Date(year, month, 1)
+    const endDate = new Date(year, month + 1, 0) // Último día del mes
+
+    const startStr = startDate.toISOString().split('T')[0]
+    const endStr = endDate.toISOString().split('T')[0]
+
+    return await getTasks({
+      dateRange: { start: startStr, end: endStr },
       orderBy: 'due_date',
       ascending: true
     })
@@ -475,10 +596,13 @@ export const useSupabase = () => {
     pendingTasks,
     completedTasks,
 
-    // Métodos
+    // Métodos principales
     getTasks,
-    getTodaysTasks, // ✅ NUEVO
-    getUpcomingTasks, // ✅ NUEVO
+    getTodaysTasks,
+    getUpcomingTasks,
+    getTasksByDate,
+    getTasksForWeek,
+    getTasksForMonth,
     createTask,
     updateTask,
     deleteTask,
@@ -487,6 +611,10 @@ export const useSupabase = () => {
     testConnection,
     detectTableName,
     getTaskById,
+
+    // ✅ NUEVOS MÉTODOS PARA FILTRADO POR DÍA
+    filterTasksByDay,
+    restoreAllTasks,
 
     // Cliente directo para casos especiales
     supabase
