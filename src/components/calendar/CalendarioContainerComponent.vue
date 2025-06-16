@@ -250,7 +250,8 @@ const {
   deleteTask
 } = useSupabase()
 
-const { isModalOpen, openModal, closeModal } = useNewTaskModal()
+// ✅ USAR CONTEXTO ESPECÍFICO PARA EL CALENDARIO
+const { isModalOpen, openModal, closeModal } = useNewTaskModal('calendar')
 
 // Estado reactivo
 const viewMode = ref('month')
@@ -258,7 +259,7 @@ const selectedDate = ref(null)
 const calendar = ref(null)
 const creatingTask = ref(false)
 const selectedDateForTask = ref(null)
-const editingTask = ref(null) // Nueva ref para la tarea en edición
+const editingTask = ref(null)
 
 // Clases CSS
 const activeButtonClass = 'px-3 py-2 bg-primary-500 text-white rounded-lg font-medium shadow-sm'
@@ -450,6 +451,7 @@ const createTaskForDate = () => {
   // Preparar la fecha seleccionada para el modal
   selectedDateForTask.value = selectedDate.value?.date
   editingTask.value = null // Limpiar edición
+  console.log('🔧 Calendario - Abriendo modal con fecha:', selectedDateForTask.value)
   openModal()
 }
 
@@ -458,6 +460,7 @@ const handleEditTask = (task) => {
   console.log('✏️ Editar tarea:', task)
   editingTask.value = task
   selectedDateForTask.value = null // No preseleccionar fecha en edición
+  console.log('🔧 Calendario - Abriendo modal para edición')
   openModal()
 }
 
@@ -523,8 +526,9 @@ const handleUpdateStatus = async (taskId, newStatus) => {
   }
 }
 
-// Handle close modal
+// ✅ MEJORAR EL MANEJO DEL CIERRE DEL MODAL
 const handleCloseModal = () => {
+  console.log('🔧 Calendario - Cerrando modal y limpiando estado')
   editingTask.value = null
   selectedDateForTask.value = null
   closeModal()
@@ -532,6 +536,7 @@ const handleCloseModal = () => {
 
 // Cargar tareas al montar
 onMounted(async () => {
+  console.log('🔧 Calendario - Componente montado')
   await getTasks()
   // Seleccionar el día de hoy por defecto
   goToToday()
