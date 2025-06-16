@@ -277,6 +277,7 @@ export const useSupabase = () => {
 
   // Marcar tarea como completada
   const toggleTaskStatus = async (id, currentStatus) => {
+    // Tenemos 5 estados posibles: pending, completed, in-progress, on-hold, cancelled
     try {
       console.log('🔄 Cambiando estado de tarea:', { id, currentStatus })
 
@@ -288,7 +289,29 @@ export const useSupabase = () => {
         throw new Error('Estado actual es requerido')
       }
 
-      const newStatus = currentStatus === 'pending' ? 'completed' : 'pending'
+      let newStatus= null;
+      switch (currentStatus) {
+        case 'pending':
+          newStatus = 'in-progress'
+          break
+        case 'in-progress':
+          newStatus = 'completed'
+          break
+        case 'completed':
+          newStatus = 'on-hold'
+          break
+        case 'on-hold':
+          newStatus = 'cancelled'
+          break
+        case 'cancelled':
+          newStatus = 'pending'
+          break
+        default:
+          throw new Error('Estado desconocido')
+      }
+      if (!newStatus) {
+        throw new Error('No se pudo determinar el nuevo estado')
+      }
       console.log('📝 Nuevo estado:', newStatus)
 
       return await updateTask(id, { status: newStatus })

@@ -75,7 +75,7 @@
           <div class="flex items-center justify-between">
             <select
               v-model="task.status"
-              @change="updateTaskStatus"
+              @change="callUpdateTaskStatus"
               class="text-sm border-0 border-b border-gray-300 focus:border-primary-500 focus:ring-0 bg-transparent px-0 py-1">
               <option value="pending">Pendiente</option>
               <option value="in-progress">En Progreso</option>
@@ -341,13 +341,15 @@ import {
   MinusIcon,
   PauseIcon,
   BoltIcon,
-  LightBulbIcon
+  LightBulbIcon,
+  XCircleIcon
 } from '@heroicons/vue/24/outline'
 import {
   ExclamationTriangleIcon as ExclamationTriangleIconSolid,
   FireIcon as FireIconSolid,
   CheckCircleIcon as CheckCircleIconSolid,
   PlayIcon as PlayIconSolid
+
 } from '@heroicons/vue/24/solid'
 import { useSupabase } from '@/hooks/supabase'
 import { useConversationsCRUD } from '@/composables/useConversationsCRUD'
@@ -357,7 +359,7 @@ import CommentCard from '@/components/comments/CommentCard.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { getTaskById, updateTask, deleteTask } = useSupabase()
+const { getTaskById, updateTask, deleteTask, toggleTaskStatus } = useSupabase()
 
 // Conversations composable
 const {
@@ -394,6 +396,9 @@ const taskStats = ref({
   userComments: 0,
   aiComments: 0
 })
+
+// update task progress
+
 
 // Format conversations for CommentCard component
 const formattedConversations = computed(() => {
@@ -763,6 +768,25 @@ const getProgressPercentage = () => {
     case 'completed': return 100
     case 'cancelled': return 0
     default: return 0
+  }
+}
+
+const callUpdateTaskStatus = async () => {
+  if (!task.value) return
+  try {
+    console.log('🔄 TaskDetailView - Actualizando estado de tarea:', task.value.status)
+
+    // ✅ CORREGIR: Usar updateTask en lugar de toggleTaskStatus
+    await updateTask(task.value.id, { status: task.value.status })
+
+    await loadTask() // Reload task data after status change
+    console.log('✅ TaskDetailView - Estado de tarea actualizado exitosamente')
+  } catch (err) {
+    console.error('❌ TaskDetailView - Error actualizando estado de tarea:', err)
+    error.value = 'Error al actualizar el estado de la tarea'
+
+    // ✅ OPCIONAL: Revertir el cambio en caso de error
+    await loadTask()
   }
 }
 

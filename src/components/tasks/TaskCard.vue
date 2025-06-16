@@ -41,7 +41,10 @@
         <select v-model="task.status" @change="updateStatus" class="status-select">
           <option value="pending">Pendiente</option>
           <option value="in-progress">En Progreso</option>
+          <option value="on-hold">En Espera</option>
           <option value="completed">Completada</option>
+          <option value="cancelled">Cancelada</option>
+
         </select>
       </div>
       <div class="task-tags" v-if="task.tags && task.tags.length">

@@ -3,7 +3,6 @@
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-2xl font-bold text-primary-800">Mis Tareas</h1>
-      <!-- ✅ QUITAR BOTÓN NUEVA TAREA - Solo disponible desde navbar -->
     </div>
 
     <!-- Loading state -->
@@ -16,6 +15,13 @@
     <div v-if="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
       {{ error }}
     </div>
+
+    <!-- Task Filters -->
+    <TaskFilter
+      v-if="!loading"
+      :filters="filters"
+      @update:filters="updateFilters"
+    />
 
     <!-- Barra de resumen de tareas -->
     <div v-if="!loading" class="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -56,10 +62,17 @@
       </div>
     </div>
 
+    <!-- Results count -->
+    <div v-if="!loading && filteredTasks.length !== allTasks.length" class="mb-4">
+      <p class="text-sm text-gray-600">
+        Mostrando {{ filteredTasks.length }} de {{ allTasks.length }} tareas
+      </p>
+    </div>
+
     <!-- Tasks list usando TaskCard -->
-    <div v-if="!loading && allTasks.length > 0" class="space-y-4">
+    <div v-if="!loading && filteredTasks.length > 0" class="space-y-4">
       <TaskCard
-        v-for="task in allTasks"
+        v-for="task in filteredTasks"
         :key="task.id"
         :task="formatTaskForCard(task)"
         @update-task="handleUpdateTask"
@@ -69,12 +82,23 @@
     </div>
 
     <!-- Empty state -->
-    <div v-if="!loading && allTasks.length === 0" class="text-center py-12">
+    <div v-if="!loading && filteredTasks.length === 0 && allTasks.length === 0" class="text-center py-12">
       <ClipboardDocumentListIcon class="w-16 h-16 text-gray-400 mx-auto mb-4" />
       <p class="text-gray-500 mb-4">No tienes tareas</p>
       <p class="text-sm text-gray-400">
         Crea tu primera tarea usando el botón "Nueva" en la barra de navegación
       </p>
+    </div>
+
+    <!-- No results state -->
+    <div v-if="!loading && filteredTasks.length === 0 && allTasks.length > 0" class="text-center py-12">
+      <MagnifyingGlassIcon class="w-16 h-16 text-gray-400 mx-auto mb-4" />
+      <p class="text-gray-500 mb-4">No se encontraron tareas con los filtros aplicados</p>
+      <button
+        @click="clearFilters"
+        class="text-primary-600 hover:text-primary-700 text-sm">
+        Limpiar filtros
+      </button>
     </div>
   </div>
 </template>
@@ -85,10 +109,12 @@ import { useRoute } from 'vue-router'
 import {
   ClipboardDocumentListIcon,
   ClockIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  MagnifyingGlassIcon
 } from '@heroicons/vue/24/outline'
 import { useSupabase } from '@/hooks/supabase'
 import TaskCard from '@/components/tasks/TaskCard.vue'
+import TaskFilter from '@/components/tasks/TaskFilter.vue'
 
 const route = useRoute()
 const {
@@ -101,7 +127,132 @@ const {
   deleteTask
 } = useSupabase()
 
-// Computadas para los contadores
+// Filters state
+const filters = ref({
+  status: '',
+  priority: '',
+  dueDate: '',
+  search: '',
+  sortBy: 'created_at',
+  sortOrder: 'desc'
+})
+
+// Update filters
+const updateFilters = (newFilters) => {
+  filters.value = { ...newFilters }
+}
+
+const clearFilters = () => {
+  filters.value = {
+    status: '',
+    priority: '',
+    dueDate: '',
+    search: '',
+    sortBy: 'created_at',
+    sortOrder: 'desc'
+  }
+}
+
+// Helper function to check if date matches filter
+const matchesDueDateFilter = (task, filter) => {
+  if (!filter) return true
+
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+
+  if (!task.due_date) {
+    return filter === 'no-date'
+  }
+
+  const dueDate = new Date(task.due_date)
+  const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate())
+
+  switch (filter) {
+    case 'overdue':
+      return dueDateOnly < today
+    case 'today':
+      return dueDateOnly.getTime() === today.getTime()
+    case 'tomorrow':
+      return dueDateOnly.getTime() === tomorrow.getTime()
+    case 'this-week':
+      const weekFromNow = new Date(today)
+      weekFromNow.setDate(weekFromNow.getDate() + 7)
+      return dueDateOnly >= today && dueDateOnly <= weekFromNow
+    case 'next-week':
+      const nextWeekStart = new Date(today)
+      nextWeekStart.setDate(nextWeekStart.getDate() + 7)
+      const nextWeekEnd = new Date(nextWeekStart)
+      nextWeekEnd.setDate(nextWeekEnd.getDate() + 7)
+      return dueDateOnly >= nextWeekStart && dueDateOnly <= nextWeekEnd
+    case 'no-date':
+      return false // Already handled above
+    default:
+      return true
+  }
+}
+
+// Filtered and sorted tasks
+const filteredTasks = computed(() => {
+  let filtered = [...tasks.value]
+
+  // Apply filters
+  if (filters.value.status) {
+    filtered = filtered.filter(task => task.status === filters.value.status)
+  }
+
+  if (filters.value.priority) {
+    filtered = filtered.filter(task => task.priority === filters.value.priority)
+  }
+
+  if (filters.value.dueDate) {
+    filtered = filtered.filter(task => matchesDueDateFilter(task, filters.value.dueDate))
+  }
+
+  if (filters.value.search) {
+    const searchTerm = filters.value.search.toLowerCase()
+    filtered = filtered.filter(task =>
+      task.title.toLowerCase().includes(searchTerm) ||
+      (task.description && task.description.toLowerCase().includes(searchTerm))
+    )
+  }
+
+  // Apply sorting
+  filtered.sort((a, b) => {
+    let comparison = 0
+
+    switch (filters.value.sortBy) {
+      case 'title':
+        comparison = a.title.localeCompare(b.title)
+        break
+      case 'due_date':
+        if (!a.due_date && !b.due_date) comparison = 0
+        else if (!a.due_date) comparison = 1
+        else if (!b.due_date) comparison = -1
+        else comparison = new Date(a.due_date) - new Date(b.due_date)
+        break
+      case 'priority':
+        const priorityOrder = { high: 3, medium: 2, normal: 1 }
+        comparison = (priorityOrder[b.priority] || 1) - (priorityOrder[a.priority] || 1)
+        break
+      case 'status':
+        const statusOrder = { pending: 0, 'in-progress': 1, 'on-hold': 2, completed: 3, cancelled: 4 }
+        comparison = statusOrder[a.status] - statusOrder[b.status]
+        break
+      case 'created_at':
+      default:
+        comparison = new Date(a.created_at) - new Date(b.created_at)
+        break
+    }
+
+    return filters.value.sortOrder === 'asc' ? comparison : -comparison
+  })
+
+  return filtered
+})
+
+// All tasks (for original sorting when no filters)
 const allTasks = computed(() => {
   return tasks.value.sort((a, b) => {
     if (a.status !== b.status) {
@@ -113,6 +264,7 @@ const allTasks = computed(() => {
   })
 })
 
+// Task counters (based on all tasks, not filtered)
 const pendingTasksCount = computed(() => {
   return tasks.value.filter(task => task.status === 'pending').length
 })
@@ -139,9 +291,6 @@ const formatTaskForCard = (task) => {
   }
 }
 
-// ✅ QUITAR handleEditTask - Ahora TaskCard maneja la navegación internamente
-
-// Handle delete task
 const handleDeleteTask = async (taskId) => {
   if (confirm('¿Estás seguro de que quieres eliminar esta tarea?')) {
     try {
@@ -154,7 +303,6 @@ const handleDeleteTask = async (taskId) => {
   }
 }
 
-// Handle update status
 const handleUpdateStatus = async (taskId, newStatus) => {
   try {
     console.log('🔄 TaskContainer - Actualizando estado:', taskId, newStatus)
@@ -165,7 +313,6 @@ const handleUpdateStatus = async (taskId, newStatus) => {
   }
 }
 
-// ✅ NUEVO: Manejar actualización de tarea desde TaskCard
 const handleUpdateTask = async (taskData) => {
   try {
     console.log('🔄 TaskContainer - Actualizando tarea desde TaskCard:', taskData)
@@ -176,7 +323,6 @@ const handleUpdateTask = async (taskData) => {
   }
 }
 
-// Cargar tareas al montar
 onMounted(async () => {
   console.log('🔄 TaskContainer - Cargando tareas')
   await getTasks()
