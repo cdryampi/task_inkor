@@ -38,12 +38,14 @@
           v-model="localFilters.dueDate"
           @change="emitFilters"
           class="text-sm border-gray-300 rounded-md focus:border-primary-500 focus:ring-primary-500">
-          <option value="">Todas</option>
+          <!-- ✅ HOY COMO PRIMERA OPCIÓN Y POR DEFECTO -->
+          <option value="today">Solo hoy</option>
+          <option value="">Todas las fechas</option>
           <option value="overdue">Vencidas</option>
-          <option value="today">Hoy</option>
           <option value="tomorrow">Mañana</option>
           <option value="this-week">Esta semana</option>
           <option value="next-week">Próxima semana</option>
+          <option value="upcoming">Próximas</option>
           <option value="no-date">Sin fecha</option>
         </select>
       </div>
@@ -69,9 +71,10 @@
           v-model="localFilters.sortBy"
           @change="emitFilters"
           class="text-sm border-gray-300 rounded-md focus:border-primary-500 focus:ring-primary-500">
+          <option value="due_time">Hora vencimiento</option>
+          <option value="priority">Prioridad</option>
           <option value="created_at">Fecha creación</option>
           <option value="due_date">Fecha vencimiento</option>
-          <option value="priority">Prioridad</option>
           <option value="title">Título</option>
           <option value="status">Estado</option>
         </select>
@@ -103,6 +106,30 @@
         </span>
       </div>
     </div>
+
+    <!-- ✅ INFORMACIÓN SOBRE EL FILTRO ACTUAL CON ICONOS HEROICONS -->
+    <div class="mt-2 text-xs text-gray-500">
+      <span v-if="localFilters.dueDate === 'today'" class="flex items-center space-x-1">
+        <CalendarDaysIcon class="w-3 h-3" />
+        <span>Mostrando solo tareas de hoy (máximo 10) ordenadas por hora</span>
+      </span>
+      <span v-else-if="localFilters.dueDate === 'upcoming'" class="flex items-center space-x-1">
+        <ClockIcon class="w-3 h-3" />
+        <span>Mostrando tareas próximas (máximo 10)</span>
+      </span>
+      <span v-else-if="localFilters.dueDate === ''" class="flex items-center space-x-1">
+        <ClipboardDocumentListIcon class="w-3 h-3" />
+        <span>Mostrando todas las tareas</span>
+      </span>
+      <span v-else-if="localFilters.dueDate === 'overdue'" class="flex items-center space-x-1">
+        <ExclamationTriangleIcon class="w-3 h-3 text-red-500" />
+        <span>Filtro aplicado: {{ getCurrentFilterLabel() }}</span>
+      </span>
+      <span v-else class="flex items-center space-x-1">
+        <FunnelIcon class="w-3 h-3" />
+        <span>Filtro aplicado: {{ getCurrentFilterLabel() }}</span>
+      </span>
+    </div>
   </div>
 </template>
 
@@ -112,7 +139,12 @@ import {
   MagnifyingGlassIcon,
   ArrowUpIcon,
   ArrowDownIcon,
-  XMarkIcon
+  XMarkIcon,
+  CalendarDaysIcon,
+  ClockIcon,
+  ClipboardDocumentListIcon,
+  ExclamationTriangleIcon,
+  FunnelIcon
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -121,32 +153,43 @@ const props = defineProps({
     default: () => ({
       status: '',
       priority: '',
-      dueDate: '',
+      dueDate: 'today', // ✅ VALOR POR DEFECTO
       search: '',
-      sortBy: 'created_at',
-      sortOrder: 'desc'
+      sortBy: 'due_time', // ✅ ORDENAR POR HORA POR DEFECTO
+      sortOrder: 'asc'
     })
   }
 })
 
 const emit = defineEmits(['update:filters'])
 
-// Local reactive copy of filters
-const localFilters = ref({ ...props.filters })
+// ✅ ASEGURAR QUE LOCALFILTERS SIEMPRE INICIE CON 'today'
+const localFilters = ref({
+  status: '',
+  priority: '',
+  dueDate: 'today', // ✅ FORZAR VALOR POR DEFECTO
+  search: '',
+  sortBy: 'due_time',
+  sortOrder: 'asc',
+  ...props.filters // Sobrescribir con props si existen
+})
 
 // Watch for external filter changes
 watch(() => props.filters, (newFilters) => {
-  localFilters.value = { ...newFilters }
+  localFilters.value = {
+    ...localFilters.value,
+    ...newFilters
+  }
 }, { deep: true })
 
-// Computed properties
+// ✅ COMPUTED PROPERTIES ACTUALIZADAS
 const hasActiveFilters = computed(() => {
   return localFilters.value.status ||
          localFilters.value.priority ||
-         localFilters.value.dueDate ||
+         localFilters.value.dueDate !== 'today' || // ✅ HOY ES EL ESTADO "NORMAL"
          localFilters.value.search ||
-         localFilters.value.sortBy !== 'created_at' ||
-         localFilters.value.sortOrder !== 'desc'
+         localFilters.value.sortBy !== 'due_time' ||
+         localFilters.value.sortOrder !== 'asc'
 })
 
 const activeFiltersSummary = computed(() => {
@@ -178,18 +221,21 @@ const activeFiltersSummary = computed(() => {
     })
   }
 
-  if (localFilters.value.dueDate) {
+  // ✅ SOLO MOSTRAR FILTRO DE FECHA SI NO ES "HOY"
+  if (localFilters.value.dueDate && localFilters.value.dueDate !== 'today') {
     const dueDateLabels = {
       overdue: 'Vencidas',
-      today: 'Vencen hoy',
-      tomorrow: 'Vencen mañana',
+      today: 'Solo hoy',
+      tomorrow: 'Mañana',
       'this-week': 'Esta semana',
       'next-week': 'Próxima semana',
-      'no-date': 'Sin fecha'
+      'upcoming': 'Próximas',
+      'no-date': 'Sin fecha',
+      '': 'Todas las fechas'
     }
     summary.push({
       key: 'dueDate',
-      label: dueDateLabels[localFilters.value.dueDate]
+      label: dueDateLabels[localFilters.value.dueDate] || 'Filtro de fecha'
     })
   }
 
@@ -202,6 +248,21 @@ const activeFiltersSummary = computed(() => {
 
   return summary
 })
+
+// ✅ FUNCIÓN PARA OBTENER ETIQUETA DEL FILTRO ACTUAL
+const getCurrentFilterLabel = () => {
+  const dueDateLabels = {
+    overdue: 'Vencidas',
+    today: 'Solo hoy',
+    tomorrow: 'Mañana',
+    'this-week': 'Esta semana',
+    'next-week': 'Próxima semana',
+    'upcoming': 'Próximas',
+    'no-date': 'Sin fecha',
+    '': 'Todas las fechas'
+  }
+  return dueDateLabels[localFilters.value.dueDate] || 'Desconocido'
+}
 
 // Methods
 const emitFilters = () => {
@@ -217,10 +278,10 @@ const clearFilters = () => {
   localFilters.value = {
     status: '',
     priority: '',
-    dueDate: '',
+    dueDate: 'today', // ✅ SIEMPRE RESETEAR A HOY
     search: '',
-    sortBy: 'created_at',
-    sortOrder: 'desc'
+    sortBy: 'due_time',
+    sortOrder: 'asc'
   }
   emitFilters()
 }

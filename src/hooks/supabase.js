@@ -43,18 +43,59 @@ export const useSupabase = () => {
     }
   }
 
-  // Obtener todas las tareas
-  const getTasks = async () => {
+  // ✅ MÉTODO MEJORADO: Obtener tareas con filtros opcionales
+  const getTasks = async (options = {}) => {
     loading.value = true
     error.value = null
 
     try {
-      console.log('🔍 Obteniendo tareas desde tabla:', tableName.value)
+      console.log('🔍 Obteniendo tareas desde tabla:', tableName.value, 'con opciones:', options)
 
-      const { data, error: supabaseError } = await supabase
+      // Construir query base
+      let query = supabase
         .from(tableName.value)
         .select('*')
-        .order('created_at', { ascending: false })
+
+      // ✅ FILTRO POR FECHA DE HOY AL FUTURO
+      if (options.fromToday) {
+        const today = new Date()
+        const todayStr = today.toISOString().split('T')[0] // YYYY-MM-DD
+        console.log('📅 Filtrando desde hoy:', todayStr)
+
+        query = query.or(`due_date.gte.${todayStr},due_date.is.null`)
+      }
+
+      // ✅ FILTRO POR FECHA ESPECÍFICA (HOY)
+      if (options.today) {
+        const today = new Date()
+        const todayStr = today.toISOString().split('T')[0] // YYYY-MM-DD
+        console.log('📅 Filtrando solo hoy:', todayStr)
+
+        query = query.eq('due_date', todayStr)
+      }
+
+      // ✅ LÍMITE DE RESULTADOS
+      if (options.limit) {
+        console.log('🔢 Aplicando límite:', options.limit)
+        query = query.limit(options.limit)
+      }
+
+      // ✅ ORDENAMIENTO (por defecto por fecha de creación)
+      const orderBy = options.orderBy || 'created_at'
+      const ascending = options.ascending || false
+      query = query.order(orderBy, { ascending })
+
+      // ✅ FILTRO POR ESTADO
+      if (options.status) {
+        query = query.eq('status', options.status)
+      }
+
+      // ✅ FILTRO POR PRIORIDAD
+      if (options.priority) {
+        query = query.eq('priority', options.priority)
+      }
+
+      const { data, error: supabaseError } = await query
 
       if (supabaseError) {
         console.error('❌ Error de Supabase:', supabaseError)
@@ -62,15 +103,40 @@ export const useSupabase = () => {
       }
 
       tasks.value = data || []
-      console.log('✅ Tareas cargadas:', data?.length || 0, data)
+      console.log('✅ Tareas cargadas:', data?.length || 0, 'filtros aplicados:', options)
+
+      return data || []
 
     } catch (err) {
       const errorMessage = `Error al cargar tareas: ${err.message}`
       error.value = errorMessage
       console.error('❌ Error completo:', err)
+      throw err
     } finally {
       loading.value = false
     }
+  }
+
+  // ✅ MÉTODO ESPECÍFICO PARA TAREAS DE HOY
+  const getTodaysTasks = async (limit = 10) => {
+    console.log('📅 Obteniendo tareas de hoy con límite:', limit)
+    return await getTasks({
+      today: true,
+      limit,
+      orderBy: 'due_time',
+      ascending: true
+    })
+  }
+
+  // ✅ MÉTODO ESPECÍFICO PARA TAREAS FUTURAS
+  const getUpcomingTasks = async (limit = 10) => {
+    console.log('🔮 Obteniendo tareas futuras con límite:', limit)
+    return await getTasks({
+      fromToday: true,
+      limit,
+      orderBy: 'due_date',
+      ascending: true
+    })
   }
 
   // Crear nueva tarea
@@ -411,6 +477,8 @@ export const useSupabase = () => {
 
     // Métodos
     getTasks,
+    getTodaysTasks, // ✅ NUEVO
+    getUpcomingTasks, // ✅ NUEVO
     createTask,
     updateTask,
     deleteTask,

@@ -66,6 +66,7 @@
     <div v-if="!loading && filteredTasks.length !== allTasks.length" class="mb-4">
       <p class="text-sm text-gray-600">
         Mostrando {{ filteredTasks.length }} de {{ allTasks.length }} tareas
+        <span v-if="isLimitedView" class="text-primary-600">(limitado a 10 por rendimiento)</span>
       </p>
     </div>
 
@@ -104,7 +105,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   ClipboardDocumentListIcon,
@@ -122,19 +123,26 @@ const {
   loading,
   error,
   getTasks,
+  getTodaysTasks, // ✅ NUEVO
+  getUpcomingTasks, // ✅ NUEVO
   updateTask,
   toggleTaskStatus,
   deleteTask
 } = useSupabase()
 
-// Filters state
+// ✅ FILTROS CON VALORES POR DEFECTO PARA HOY
 const filters = ref({
   status: '',
   priority: '',
-  dueDate: '',
+  dueDate: 'today', // ✅ POR DEFECTO HOY
   search: '',
-  sortBy: 'created_at',
-  sortOrder: 'desc'
+  sortBy: 'due_time', // ✅ POR DEFECTO HORA
+  sortOrder: 'asc'
+})
+
+// ✅ INDICADOR SI ESTAMOS EN VISTA LIMITADA
+const isLimitedView = computed(() => {
+  return filters.value.dueDate === 'today' || filters.value.dueDate === 'upcoming'
 })
 
 // Update filters
@@ -146,12 +154,47 @@ const clearFilters = () => {
   filters.value = {
     status: '',
     priority: '',
-    dueDate: '',
+    dueDate: 'today', // ✅ RESETEAR A HOY
     search: '',
-    sortBy: 'created_at',
-    sortOrder: 'desc'
+    sortBy: 'due_time', // ✅ RESETEAR A HORA
+    sortOrder: 'asc'
   }
 }
+
+// ✅ FUNCIÓN MEJORADA PARA CARGAR TAREAS SEGÚN FILTROS
+const loadTasksBasedOnFilters = async () => {
+  try {
+    console.log('🔄 Cargando tareas con filtros:', filters.value)
+
+    // Usar métodos específicos para casos optimizados
+    if (filters.value.dueDate === 'today') {
+      console.log('📅 Cargando tareas de hoy (límite 10)')
+      await getTodaysTasks(10)
+    } else if (filters.value.dueDate === 'upcoming') {
+      console.log('🔮 Cargando tareas próximas (límite 10)')
+      await getUpcomingTasks(10)
+    } else {
+      console.log('📋 Cargando todas las tareas')
+      await getTasks()
+    }
+  } catch (err) {
+    console.error('❌ Error cargando tareas:', err)
+  }
+}
+
+// ✅ WATCH PARA RECARGAR CUANDO CAMBIE EL FILTRO DE FECHA
+watch(
+  () => filters.value.dueDate,
+  (newDueDate, oldDueDate) => {
+    console.log('🔄 Filtro de fecha cambió:', { oldDueDate, newDueDate })
+
+    // Solo recargar si es un cambio significativo que requiere nuevos datos
+    if ((oldDueDate === 'today' || oldDueDate === 'upcoming') ||
+        (newDueDate === 'today' || newDueDate === 'upcoming')) {
+      loadTasksBasedOnFilters()
+    }
+  }
+)
 
 // Helper function to check if date matches filter
 const matchesDueDateFilter = (task, filter) => {
@@ -186,8 +229,10 @@ const matchesDueDateFilter = (task, filter) => {
       const nextWeekEnd = new Date(nextWeekStart)
       nextWeekEnd.setDate(nextWeekEnd.getDate() + 7)
       return dueDateOnly >= nextWeekStart && dueDateOnly <= nextWeekEnd
+    case 'upcoming':
+      return dueDateOnly >= today
     case 'no-date':
-      return false // Already handled above
+      return false // Ya se maneja arriba
     default:
       return true
   }
@@ -197,7 +242,29 @@ const matchesDueDateFilter = (task, filter) => {
 const filteredTasks = computed(() => {
   let filtered = [...tasks.value]
 
-  // Apply filters
+  // ✅ PARA CASOS OPTIMIZADOS, LA FILTRACIÓN YA SE HIZO EN LA BASE DE DATOS
+  if (filters.value.dueDate === 'today' || filters.value.dueDate === 'upcoming') {
+    // Solo aplicar filtros adicionales
+    if (filters.value.status) {
+      filtered = filtered.filter(task => task.status === filters.value.status)
+    }
+
+    if (filters.value.priority) {
+      filtered = filtered.filter(task => task.priority === filters.value.priority)
+    }
+
+    if (filters.value.search) {
+      const searchTerm = filters.value.search.toLowerCase()
+      filtered = filtered.filter(task =>
+        task.title.toLowerCase().includes(searchTerm) ||
+        (task.description && task.description.toLowerCase().includes(searchTerm))
+      )
+    }
+
+    return filtered // Ya están ordenados desde la BD
+  }
+
+  // Apply filters para otros casos
   if (filters.value.status) {
     filtered = filtered.filter(task => task.status === filters.value.status)
   }
@@ -231,6 +298,12 @@ const filteredTasks = computed(() => {
         else if (!a.due_date) comparison = 1
         else if (!b.due_date) comparison = -1
         else comparison = new Date(a.due_date) - new Date(b.due_date)
+        break
+      case 'due_time':
+        if (!a.due_time && !b.due_time) comparison = 0
+        else if (!a.due_time) comparison = 1
+        else if (!b.due_time) comparison = -1
+        else comparison = a.due_time.localeCompare(b.due_time)
         break
       case 'priority':
         const priorityOrder = { high: 3, medium: 2, normal: 1 }
@@ -324,8 +397,8 @@ const handleUpdateTask = async (taskData) => {
 }
 
 onMounted(async () => {
-  console.log('🔄 TaskContainer - Cargando tareas')
-  await getTasks()
+  console.log('🔄 TaskContainer - Cargando tareas iniciales')
+  await loadTasksBasedOnFilters()
 })
 </script>
 
