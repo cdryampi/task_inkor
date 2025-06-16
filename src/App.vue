@@ -1,5 +1,8 @@
 <template>
   <div id="app">
+    <Notivue v-slot="item">
+      <Notification :item="item" />
+    </Notivue>
     <NavBarComponent />
     <router-view />
 
@@ -18,6 +21,7 @@ import NavBarComponent from '@/components/custom/NavBarComponent.vue'
 import NewTaskModal from '@/components/modals/NewTaskModal.vue'
 import { useNewTaskModal } from '@/composables/useNewTaskModal'
 import { useSupabase } from '@/hooks/supabase'
+import { Notivue, Notification } from 'notivue'
 
 // Estado global del modal
 const { isModalOpen: isGlobalModalOpen, closeModal } = useNewTaskModal()

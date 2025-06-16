@@ -16,6 +16,7 @@
     "@supabase/supabase-js": "^2.50.0",
     "@tailwindcss/vite": "^4.1.8",
     "flowbite": "^3.1.2",
+    "notivue": "^2.4.5",
     "tailwindcss": "^4.1.8",
     "v-calendar": "^3.1.2",
     "vue": "^3.5.13",

@@ -101,6 +101,15 @@
         Limpiar filtros
       </button>
     </div>
+
+    <!-- ✅ MODAL DE CONFIRMACIÓN PERSONALIZADO -->
+    <ConfirmDeleteModal
+      :isOpen="deleteConfirmModal.isOpen"
+      :taskTitle="deleteConfirmModal.taskTitle"
+      :loading="deleteConfirmModal.loading"
+      @confirm="confirmDeleteTask"
+      @cancel="cancelDeleteTask"
+    />
   </div>
 </template>
 
@@ -116,6 +125,10 @@ import {
 import { useSupabase } from '@/hooks/supabase'
 import TaskCard from '@/components/tasks/TaskCard.vue'
 import TaskFilter from '@/components/tasks/TaskFilter.vue'
+import ConfirmDeleteModal from '@/components/modals/ConfirmDeleteModal.vue'
+
+// ✅ IMPORTAR NOTIVUE
+import { push } from 'notivue'
 
 const route = useRoute()
 const {
@@ -123,20 +136,28 @@ const {
   loading,
   error,
   getTasks,
-  getTodaysTasks, // ✅ NUEVO
-  getUpcomingTasks, // ✅ NUEVO
+  getTodaysTasks,
+  getUpcomingTasks,
   updateTask,
   toggleTaskStatus,
   deleteTask
 } = useSupabase()
 
+// ✅ ESTADO PARA EL MODAL DE CONFIRMACIÓN
+const deleteConfirmModal = ref({
+  isOpen: false,
+  taskId: null,
+  taskTitle: '',
+  loading: false
+})
+
 // ✅ FILTROS CON VALORES POR DEFECTO PARA HOY
 const filters = ref({
   status: '',
   priority: '',
-  dueDate: 'today', // ✅ POR DEFECTO HOY
+  dueDate: 'today',
   search: '',
-  sortBy: 'due_time', // ✅ POR DEFECTO HORA
+  sortBy: 'due_time',
   sortOrder: 'asc'
 })
 
@@ -154,11 +175,17 @@ const clearFilters = () => {
   filters.value = {
     status: '',
     priority: '',
-    dueDate: 'today', // ✅ RESETEAR A HOY
+    dueDate: 'today',
     search: '',
-    sortBy: 'due_time', // ✅ RESETEAR A HORA
+    sortBy: 'due_time',
     sortOrder: 'asc'
   }
+
+  // ✅ NOTIFICACIÓN PARA LIMPIAR FILTROS
+  push.info({
+    title: 'Filtros limpiados',
+    message: 'Se han restablecido los filtros por defecto'
+  })
 }
 
 // ✅ FUNCIÓN MEJORADA PARA CARGAR TAREAS SEGÚN FILTROS
@@ -179,6 +206,11 @@ const loadTasksBasedOnFilters = async () => {
     }
   } catch (err) {
     console.error('❌ Error cargando tareas:', err)
+    // ✅ NOTIFICACIÓN DE ERROR
+    push.error({
+      title: 'Error al cargar tareas',
+      message: 'No se pudieron cargar las tareas. Inténtalo de nuevo.'
+    })
   }
 }
 
@@ -232,7 +264,7 @@ const matchesDueDateFilter = (task, filter) => {
     case 'upcoming':
       return dueDateOnly >= today
     case 'no-date':
-      return false // Ya se maneja arriba
+      return false
     default:
       return true
   }
@@ -364,25 +396,103 @@ const formatTaskForCard = (task) => {
   }
 }
 
+// ✅ MANEJO MEJORADO DE ELIMINACIÓN CON MODAL
 const handleDeleteTask = async (taskId) => {
-  if (confirm('¿Estás seguro de que quieres eliminar esta tarea?')) {
-    try {
-      console.log('🗑️ TaskContainer - Eliminando tarea:', taskId)
-      await deleteTask(taskId)
-      console.log('✅ TaskContainer - Tarea eliminada exitosamente')
-    } catch (err) {
-      console.error('❌ TaskContainer - Error eliminando tarea:', err)
+  const task = tasks.value.find(t => t.id === taskId)
+  if (!task) {
+    push.error({
+      title: 'Error',
+      message: 'Tarea no encontrada'
+    })
+    return
+  }
+
+  // Abrir modal de confirmación
+  deleteConfirmModal.value = {
+    isOpen: true,
+    taskId: taskId,
+    taskTitle: task.title,
+    loading: false
+  }
+}
+
+// ✅ CONFIRMAR ELIMINACIÓN
+const confirmDeleteTask = async () => {
+  deleteConfirmModal.value.loading = true
+
+  try {
+    const taskTitle = deleteConfirmModal.value.taskTitle
+    console.log('🗑️ TaskContainer - Eliminando tarea:', deleteConfirmModal.value.taskId)
+
+    await deleteTask(deleteConfirmModal.value.taskId)
+
+    // Notificación de éxito
+    push.success({
+      title: 'Tarea eliminada',
+      message: `"${taskTitle}" ha sido eliminada exitosamente`
+    })
+
+    console.log('✅ TaskContainer - Tarea eliminada exitosamente')
+  } catch (err) {
+    console.error('❌ TaskContainer - Error eliminando tarea:', err)
+
+    // Notificación de error
+    push.error({
+      title: 'Error al eliminar',
+      message: 'No se pudo eliminar la tarea. Inténtalo de nuevo.'
+    })
+  } finally {
+    // Cerrar modal
+    deleteConfirmModal.value = {
+      isOpen: false,
+      taskId: null,
+      taskTitle: '',
+      loading: false
     }
+  }
+}
+
+// ✅ CANCELAR ELIMINACIÓN
+const cancelDeleteTask = () => {
+  deleteConfirmModal.value = {
+    isOpen: false,
+    taskId: null,
+    taskTitle: '',
+    loading: false
   }
 }
 
 const handleUpdateStatus = async (taskId, newStatus) => {
   try {
     console.log('🔄 TaskContainer - Actualizando estado:', taskId, newStatus)
+
+    const task = tasks.value.find(t => t.id === taskId)
+    const oldStatus = task?.status || 'desconocido'
+
     await toggleTaskStatus(taskId, newStatus)
+
+    // ✅ NOTIFICACIÓN DE ACTUALIZACIÓN DE ESTADO
+    const statusLabels = {
+      pending: 'Pendiente',
+      'in-progress': 'En Progreso',
+      'on-hold': 'En Pausa',
+      completed: 'Completada',
+      cancelled: 'Cancelada'
+    }
+
+    push.success({
+      title: 'Estado actualizado',
+      message: `Estado cambiado a "${statusLabels[newStatus] || newStatus}"`
+    })
+
     console.log('✅ TaskContainer - Estado actualizado exitosamente')
   } catch (err) {
     console.error('❌ TaskContainer - Error actualizando estado:', err)
+
+    push.error({
+      title: 'Error al actualizar',
+      message: 'No se pudo actualizar el estado de la tarea'
+    })
   }
 }
 
@@ -390,9 +500,21 @@ const handleUpdateTask = async (taskData) => {
   try {
     console.log('🔄 TaskContainer - Actualizando tarea desde TaskCard:', taskData)
     await updateTask(taskData.id, taskData)
+
+    // ✅ NOTIFICACIÓN DE ACTUALIZACIÓN DE TAREA
+    push.success({
+      title: 'Tarea actualizada',
+      message: `"${taskData.title}" ha sido actualizada`
+    })
+
     console.log('✅ TaskContainer - Tarea actualizada exitosamente')
   } catch (err) {
     console.error('❌ TaskContainer - Error actualizando tarea:', err)
+
+    push.error({
+      title: 'Error al actualizar',
+      message: 'No se pudo actualizar la tarea'
+    })
   }
 }
 
