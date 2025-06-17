@@ -18,3 +18,15 @@ export const mensajesTopbar = [
   "Siri, termina mis tareas por mí, gracias.",
   "¡Felicidades! Has abierto la app. Puedes descansar tranquilo."
 ];
+export const motivationalMessages = [
+    "¡Eres más capaz de lo que crees! Cada tarea completada es un pequeño triunfo. 🌟",
+    "La procrastinación es solo miedo disfrazado. Pero aquí estoy para ayudarte a superarlo. 💪",
+    "Recuerda: no tienes que ser perfecto, solo tienes que empezar. Yo estaré aquí para guiarte. 🎯",
+    "Tu productividad no define tu valor, pero organizarte te hará sentir increíble. ✨",
+    "Cada día es una nueva oportunidad para ser la versión más organizada de ti mismo. 🌅",
+    "No estás solo en esto. Juntos haremos que tu lista de tareas sea tu mejor aliada. 🤝",
+    "La clave no es hacer todo perfecto, sino hacer algo consistentemente. ¡Vamos! 🔥",
+    "Tu futuro yo te agradecerá por cada pequeño paso que des hoy. 🚀",
+    "Cada pequeña tarea completada es un acto de amor propio. Te mereces estar organizado. 💚",
+    "No hay tareas pequeñas, solo pasos grandes hacia tu mejor versión. ¡Sigamos! 🎯"
+]
