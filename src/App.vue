@@ -3,6 +3,9 @@
     <Notivue v-slot="item">
       <Notification :item="item" />
     </Notivue>
+    <!-- Header component -->
+    <TopBarComponent />
+    <!-- NavBar component -->
     <NavBarComponent />
     <router-view />
 
@@ -13,6 +16,8 @@
       @close="closeGlobalModal"
       @submit="handleCreateTask" />
   </div>
+  <!-- Footer component -->
+  <FooterComponent />
 </template>
 
 <script setup>
@@ -22,6 +27,8 @@ import NewTaskModal from '@/components/modals/NewTaskModal.vue'
 import { useNewTaskModal } from '@/composables/useNewTaskModal'
 import { useSupabase } from '@/hooks/supabase'
 import { Notivue, Notification } from 'notivue'
+import FooterComponent from './components/custom/FooterComponent.vue'
+import TopBarComponent from './components/custom/TopBarComponent.vue'
 
 // Estado global del modal
 const { isModalOpen: isGlobalModalOpen, closeModal } = useNewTaskModal()

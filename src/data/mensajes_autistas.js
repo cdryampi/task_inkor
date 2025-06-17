@@ -1,0 +1,20 @@
+export const mensajesTopbar = [
+  "Hoy solo he abierto la app para sentirme menos culpable.",
+  "Tu tarea de hoy: sobrevivir. Lo demás es opcional.",
+  "Si no terminas nada, al menos lo intentaste (abriste la app, eso cuenta).",
+  "Hecho es mejor que perfecto… pero procrastinado es más divertido.",
+  "¿Has probado apagar el ordenador y volver a encender tu motivación?",
+  "¿Para qué hacer hoy lo que puedes posponer eternamente?",
+  "Mis neuronas aún están cargando, por favor espera...",
+  "No tengo sueño, tengo tareas pendientes.",
+  "Aquí gestionando mis ganas de hacer nada.",
+  "Un día más sin ser millonario por hacer la lista de tareas.",
+  "Consejo del día: Si nadie ve que procrastinas, ¿realmente lo hiciste?",
+  "¿Meta de hoy? No cerrar la app en los próximos 5 minutos.",
+  "Plan para hoy: abrir la app, suspirar fuerte y seguir con mi vida.",
+  "Lo importante no es avanzar, sino parecer ocupado.",
+  "Mi app, mis reglas: procrastinación ilimitada.",
+  "¿Sabías que puedes posponer tus tareas hasta que dejen de ser relevantes?",
+  "Siri, termina mis tareas por mí, gracias.",
+  "¡Felicidades! Has abierto la app. Puedes descansar tranquilo."
+];
