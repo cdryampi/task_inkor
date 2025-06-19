@@ -462,14 +462,32 @@ const cancelDeleteTask = () => {
   }
 }
 
+// ✅ MANEJAR ACTUALIZACIÓN DE ESTADO - IGUAL QUE TaskDetailView
 const handleUpdateStatus = async (taskId, newStatus) => {
   try {
     console.log('🔄 TaskContainer - Actualizando estado:', taskId, newStatus)
 
     const task = tasks.value.find(t => t.id === taskId)
-    const oldStatus = task?.status || 'desconocido'
+    if (!task) {
+      push.error({
+        title: 'Error',
+        message: 'Tarea no encontrada'
+      })
+      return
+    }
 
-    await toggleTaskStatus(taskId, newStatus)
+    const oldStatus = task.status
+
+    // ✅ EVITAR ACTUALIZACIÓN DOBLE - Solo actualizar si realmente cambió
+    if (oldStatus === newStatus) {
+      console.log('⚠️ TaskContainer - Estado ya es el mismo, ignorando:', newStatus)
+      return
+    }
+
+    console.log('📊 TaskContainer - Cambiando estado:', { taskId, oldStatus, newStatus })
+
+    // ✅ USAR updateTask EN LUGAR DE toggleTaskStatus (igual que TaskDetailView)
+    await updateTask(taskId, { status: newStatus })
 
     // ✅ NOTIFICACIÓN DE ACTUALIZACIÓN DE ESTADO
     const statusLabels = {
@@ -482,7 +500,7 @@ const handleUpdateStatus = async (taskId, newStatus) => {
 
     push.success({
       title: 'Estado actualizado',
-      message: `Estado cambiado a "${statusLabels[newStatus] || newStatus}"`
+      message: `"${task.title}" cambió a "${statusLabels[newStatus] || newStatus}"`
     })
 
     console.log('✅ TaskContainer - Estado actualizado exitosamente')
@@ -493,6 +511,10 @@ const handleUpdateStatus = async (taskId, newStatus) => {
       title: 'Error al actualizar',
       message: 'No se pudo actualizar el estado de la tarea'
     })
+
+    // ✅ REVERTIR EL ESTADO LOCAL EN CASO DE ERROR
+    // Esto forzará que el TaskCard sincronice con el estado original
+    await loadTasksBasedOnFilters()
   }
 }
 

@@ -463,47 +463,69 @@ export const useSupabase = () => {
   }
 
   // Marcar tarea como completada
-  const toggleTaskStatus = async (id, currentStatus) => {
-    // Tenemos 5 estados posibles: pending, completed, in-progress, on-hold, cancelled
+  const toggleTaskStatus = async (taskId, newStatus) => {
+    console.log('🔄 Cambiando estado de tarea:', { id: taskId, currentStatus: tasks.value.find(t => t.id === taskId)?.status })
+    console.log('📝 Nuevo estado:', newStatus)
+
     try {
-      console.log('🔄 Cambiando estado de tarea:', { id, currentStatus })
-
-      if (!id) {
-        throw new Error('ID de tarea es requerido')
+      // ✅ VERIFICAR SI YA TIENE ESE ESTADO
+      const currentTask = tasks.value.find(t => t.id === taskId)
+      if (currentTask && currentTask.status === newStatus) {
+        console.log('⚠️ Supabase - Estado ya es el mismo, omitiendo actualización')
+        return currentTask
       }
 
-      if (!currentStatus) {
-        throw new Error('Estado actual es requerido')
+      // ✅ PRIMERO VERIFICAR QUE LA TAREA EXISTE
+      const { data: existingTask, error: checkError } = await supabase
+        .from(tableName.value)
+        .select('id, status')
+        .eq('id', taskId)
+        .maybeSingle() // ✅ Usar maybeSingle en lugar de single
+
+      if (checkError) {
+        console.error('❌ Error verificando tarea:', checkError)
+        throw checkError
       }
 
-      let newStatus= null;
-      switch (currentStatus) {
-        case 'pending':
-          newStatus = 'in-progress'
-          break
-        case 'in-progress':
-          newStatus = 'completed'
-          break
-        case 'completed':
-          newStatus = 'on-hold'
-          break
-        case 'on-hold':
-          newStatus = 'cancelled'
-          break
-        case 'cancelled':
-          newStatus = 'pending'
-          break
-        default:
-          throw new Error('Estado desconocido')
+      if (!existingTask) {
+        console.warn('⚠️ Tarea no encontrada:', taskId)
+        throw new Error('La tarea no existe o fue eliminada')
       }
-      if (!newStatus) {
-        throw new Error('No se pudo determinar el nuevo estado')
-      }
-      console.log('📝 Nuevo estado:', newStatus)
 
-      return await updateTask(id, { status: newStatus })
+      // ✅ ACTUALIZAR ESTADO
+      const { data, error } = await supabase
+        .from(tableName.value)
+        .update({ status: newStatus })
+        .eq('id', taskId)
+        .select()
+        .maybeSingle() // ✅ Usar maybeSingle para evitar error si no hay resultados
+
+      if (error) {
+        console.error('❌ Error actualizando estado:', error)
+        throw error
+      }
+
+      if (!data) {
+        throw new Error('No se pudo actualizar la tarea')
+      }
+
+      console.log('✅ Estado actualizado en BD:', data)
+
+      // ✅ ACTUALIZAR SOLO UNA VEZ EN EL ARRAY LOCAL
+      const taskIndex = tasks.value.findIndex(t => t.id === taskId)
+      if (taskIndex !== -1) {
+        // Actualizar inmutablemente
+        tasks.value = [
+          ...tasks.value.slice(0, taskIndex),
+          { ...tasks.value[taskIndex], status: newStatus, updated_at: data.updated_at },
+          ...tasks.value.slice(taskIndex + 1)
+        ]
+        console.log('✅ Array local actualizado - toggleTaskStatus')
+      }
+
+      return data
     } catch (err) {
-      console.error('❌ Error al cambiar estado:', err)
+      console.error('❌ Error en toggleTaskStatus:', err)
       throw err
     }
   }
@@ -570,7 +592,7 @@ export const useSupabase = () => {
       console.log('🔍 Buscando tarea:', taskId)
 
       const { data, error: fetchError } = await supabase
-        .from('task')
+        .from(tableName.value) // ✅ Usar tableName.value en lugar de 'task' hardcodeado
         .select('*')
         .eq('id', taskId)
         .single()

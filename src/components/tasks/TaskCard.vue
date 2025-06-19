@@ -38,13 +38,13 @@
     <div class="task-footer">
       <div class="task-status">
         <ClipboardDocumentListIcon class="w-4 h-4 text-gray-500" />
-        <select v-model="task.status" @change="updateStatus" class="status-select">
+        <!-- ✅ USAR VALOR LOCAL EN LUGAR DE PROP DIRECTA -->
+        <select v-model="localStatus" @change="updateStatus" class="status-select">
           <option value="pending">Pendiente</option>
           <option value="in-progress">En Progreso</option>
           <option value="on-hold">En Espera</option>
           <option value="completed">Completada</option>
           <option value="cancelled">Cancelada</option>
-
         </select>
       </div>
       <div class="task-tags" v-if="task.tags && task.tags.length">
@@ -118,7 +118,9 @@ export default {
   data() {
     return {
       isEditModalOpen: false,
-      updatingTask: false
+      updatingTask: false,
+      // ✅ VALOR LOCAL PARA EL STATUS
+      localStatus: this.task.status
     }
   },
   setup() {
@@ -127,7 +129,18 @@ export default {
   },
   computed: {
     taskStatusClass() {
-      return `status-${this.task.status}`;
+      // ✅ USAR EL STATUS LOCAL PARA LA CLASE CSS
+      return `status-${this.localStatus}`;
+    }
+  },
+  // ✅ WATCH PARA SINCRONIZAR CON LA PROP CUANDO CAMBIE DESDE EL PADRE
+  watch: {
+    'task.status': {
+      handler(newStatus) {
+        console.log('🔄 TaskCard - Status de prop cambió:', newStatus)
+        this.localStatus = newStatus
+      },
+      immediate: true
     }
   },
   methods: {
@@ -189,10 +202,13 @@ export default {
       this.$emit('delete-task', this.task.id);
     },
 
-    // ✅ ACTUALIZAR ESTADO
+    // ✅ ACTUALIZAR ESTADO - MEJORADO
     updateStatus() {
-      console.log('🔄 TaskCard - Emitiendo update-status:', this.task.id, this.task.status)
-      this.$emit('update-status', this.task.id, this.task.status);
+      console.log('🔄 TaskCard - Emitiendo update-status:', this.task.id, this.localStatus)
+      console.log('📊 TaskCard - Status anterior:', this.task.status, '-> Nuevo:', this.localStatus)
+
+      // Emitir al padre con el nuevo status
+      this.$emit('update-status', this.task.id, this.localStatus);
     },
 
     // ✅ MÉTODOS DE UTILIDAD

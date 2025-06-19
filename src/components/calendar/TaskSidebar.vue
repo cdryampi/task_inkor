@@ -45,7 +45,7 @@
           :task="formatTaskForCard(task)"
           @edit-task="$emit('edit-task', $event)"
           @delete-task="$emit('delete-task', $event)"
-          @update-status="$emit('update-status', $event)"
+          @update-status="handleUpdateStatus"
         />
       </div>
 
@@ -92,7 +92,25 @@ const props = defineProps({
   }
 })
 
-defineEmits(['edit-task', 'delete-task', 'update-status', 'create-task'])
+// ✅ DEFINIR EMITS CORRECTAMENTE
+const emit = defineEmits(['edit-task', 'delete-task', 'update-status', 'create-task'])
+
+// ✅ MANEJAR CORRECTAMENTE EL EVENTO UPDATE-STATUS
+const handleUpdateStatus = (taskId, newStatus) => {
+  console.log('📋 TaskSidebar - Recibiendo update-status:', { taskId, newStatus })
+  console.log('📋 TaskSidebar - Tipos:', { taskIdType: typeof taskId, newStatusType: typeof newStatus })
+
+  // ✅ VALIDAR PARÁMETROS
+  if (!taskId || !newStatus) {
+    console.error('❌ TaskSidebar - Parámetros inválidos:', { taskId, newStatus })
+    return
+  }
+
+  console.log('📋 TaskSidebar - Emitiendo hacia CalendarioContainer:', { taskId, newStatus })
+
+  // ✅ EMITIR CON AMBOS PARÁMETROS SEPARADOS
+  emit('update-status', taskId, newStatus)
+}
 
 const formattedDate = computed(() => {
   if (!props.selectedDate) return ''
@@ -125,3 +143,13 @@ const formatTaskForCard = (task) => {
   }
 }
 </script>
+
+<style scoped>
+.task-sidebar {
+  /* Estilos para el sidebar de tareas */
+}
+
+.tasks-list {
+  /* Estilos para la lista de tareas */
+}
+</style>

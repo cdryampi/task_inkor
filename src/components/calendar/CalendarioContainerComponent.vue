@@ -373,7 +373,7 @@ const handleCreateTask = async (taskData) => {
       taskData.due_date = dateString
     }
 
-    await createTask(taskData)
+    const newTask = await createTask(taskData)
     closeModal()
     selectedDateForTask.value = null
 
@@ -382,17 +382,26 @@ const handleCreateTask = async (taskData) => {
       message: `"${taskData.title}" ha sido programada exitosamente`
     })
 
-    // ✅ REFRESCAR FILTRO SI ESTÁ ACTIVO
+    // ✅ REFRESCAR FILTRO SI ESTÁ ACTIVO CON MEJOR MANEJO
     if (dayFilterActive.value && filteredByDate.value) {
       console.log('🔄 Refrescando filtro por día después de crear tarea')
-      await supabaseHook.filterTasksByDay(filteredByDate.value)
+      // Pequeño delay para que la BD se actualice
+      setTimeout(async () => {
+        try {
+          await supabaseHook.filterTasksByDay(filteredByDate.value)
+        } catch (refreshError) {
+          console.error('❌ Error refrescando filtro:', refreshError)
+          // Recargar todas las tareas como fallback
+          await getTasks()
+        }
+      }, 200)
     }
 
   } catch (err) {
     console.error('❌ Error creando tarea:', err)
     push.error({
       title: 'Error al crear tarea',
-      message: 'No se pudo crear la tarea. Inténtalo de nuevo.'
+      message: err.message || 'No se pudo crear la tarea. Inténtalo de nuevo.'
     })
   } finally {
     creatingTask.value = false
@@ -414,14 +423,21 @@ const handleUpdateTask = async (taskData) => {
     // ✅ REFRESCAR FILTRO SI ESTÁ ACTIVO
     if (dayFilterActive.value && filteredByDate.value) {
       console.log('🔄 Refrescando filtro por día después de actualizar tarea')
-      await supabaseHook.filterTasksByDay(filteredByDate.value)
+      setTimeout(async () => {
+        try {
+          await supabaseHook.filterTasksByDay(filteredByDate.value)
+        } catch (refreshError) {
+          console.error('❌ Error refrescando filtro:', refreshError)
+          await getTasks()
+        }
+      }, 200)
     }
 
   } catch (err) {
     console.error('❌ Error actualizando tarea:', err)
     push.error({
       title: 'Error al actualizar',
-      message: 'No se pudo actualizar la tarea. Inténtalo de nuevo.'
+      message: err.message || 'No se pudo actualizar la tarea. Inténtalo de nuevo.'
     })
   } finally {
     creatingTask.value = false
@@ -462,14 +478,21 @@ const confirmDeleteTask = async () => {
     // ✅ REFRESCAR FILTRO SI ESTÁ ACTIVO
     if (dayFilterActive.value && filteredByDate.value) {
       console.log('🔄 Refrescando filtro por día después de eliminar tarea')
-      await supabaseHook.filterTasksByDay(filteredByDate.value)
+      setTimeout(async () => {
+        try {
+          await supabaseHook.filterTasksByDay(filteredByDate.value)
+        } catch (refreshError) {
+          console.error('❌ Error refrescando filtro:', refreshError)
+          await getTasks()
+        }
+      }, 200)
     }
 
   } catch (err) {
     console.error('❌ Error eliminando tarea:', err)
     push.error({
       title: 'Error al eliminar',
-      message: 'No se pudo eliminar la tarea. Inténtalo de nuevo.'
+      message: err.message || 'No se pudo eliminar la tarea. Inténtalo de nuevo.'
     })
   } finally {
     deleteConfirmModal.value = {
@@ -490,9 +513,32 @@ const cancelDeleteTask = () => {
   }
 }
 
+// ✅ MANEJO MEJORADO DE ACTUALIZACIÓN DE ESTADO - IGUAL QUE TaskDetailView
 const handleUpdateStatus = async (taskId, newStatus) => {
   try {
-    await toggleTaskStatus(taskId, newStatus)
+    console.log('🔄 Calendario - Actualizando estado:', { taskId, newStatus })
+
+    // ✅ VERIFICAR QUE LA TAREA EXISTE LOCALMENTE PRIMERO
+    const task = tasks.value.find(t => t.id === taskId)
+    if (!task) {
+      console.warn('⚠️ Tarea no encontrada localmente:', taskId)
+      push.error({
+        title: 'Error',
+        message: 'Tarea no encontrada'
+      })
+      return
+    }
+
+    // ✅ VERIFICAR SI YA TIENE ESE ESTADO
+    if (task.status === newStatus) {
+      console.log('⚠️ Estado ya es el mismo, omitiendo actualización')
+      return
+    }
+
+    console.log('📊 Cambiando estado:', { de: task.status, a: newStatus })
+
+    // ✅ USAR updateTask EN LUGAR DE toggleTaskStatus (igual que TaskDetailView)
+    await updateTask(taskId, { status: newStatus })
 
     const statusLabels = {
       pending: 'Pendiente',
@@ -504,21 +550,53 @@ const handleUpdateStatus = async (taskId, newStatus) => {
 
     push.success({
       title: 'Estado actualizado',
-      message: `Estado cambiado a "${statusLabels[newStatus] || newStatus}"`
+      message: `"${task.title}" cambió a "${statusLabels[newStatus] || newStatus}"`
     })
 
-    // ✅ REFRESCAR FILTRO SI ESTÁ ACTIVO
+    // ✅ REFRESCAR FILTRO SI ESTÁ ACTIVO CON DEBOUNCE
     if (dayFilterActive.value && filteredByDate.value) {
       console.log('🔄 Refrescando filtro por día después de actualizar estado')
-      await supabaseHook.filterTasksByDay(filteredByDate.value)
+      // Pequeño delay para evitar condiciones de carrera
+      setTimeout(async () => {
+        try {
+          await supabaseHook.filterTasksByDay(filteredByDate.value)
+        } catch (refreshError) {
+          console.error('❌ Error refrescando filtro:', refreshError)
+          // No mostrar error al usuario, solo log
+        }
+      }, 100)
     }
+
+    console.log('✅ Calendario - Estado actualizado exitosamente')
 
   } catch (err) {
     console.error('❌ Error actualizando estado:', err)
+
+    // ✅ MANEJO ESPECÍFICO DE ERRORES
+    let errorMessage = 'No se pudo actualizar el estado de la tarea'
+
+    if (err.message && err.message.includes('no existe')) {
+      errorMessage = 'La tarea ya no existe'
+    } else if (err.message && err.message.includes('conexión')) {
+      errorMessage = 'Error de conexión. Revisa tu internet.'
+    }
+
     push.error({
       title: 'Error al actualizar',
-      message: 'No se pudo actualizar el estado de la tarea'
+      message: errorMessage
     })
+
+    // ✅ REFRESCAR TAREAS EN CASO DE ERROR PARA SINCRONIZAR
+    try {
+      console.log('🔄 Refrescando tareas después de error')
+      if (dayFilterActive.value && filteredByDate.value) {
+        await supabaseHook.filterTasksByDay(filteredByDate.value)
+      } else {
+        await getTasks()
+      }
+    } catch (refreshError) {
+      console.error('❌ Error refrescando después de error:', refreshError)
+    }
   }
 }
 
