@@ -609,6 +609,34 @@ export const useSupabase = () => {
       loading.value = false
     }
   }
+  // Obtener mensajes aleatorios usando función SQL
+  const getRandomMessages = async (limit = 20) => {
+    try {
+      loading.value = true
+      error.value = null
+
+      console.log(`🎲 Obteniendo ${limit} mensajes aleatorios...`)
+
+      const { data, error: rpcError } = await supabase
+        .rpc('get_random_chibi_messages', { limit_count: limit })
+
+      if (rpcError) {
+        console.error('❌ Error calling RPC:', rpcError)
+        error.value = rpcError
+        return []
+      }
+
+      console.log(`✅ Mensajes obtenidos: ${data?.length || 0}`)
+      return data || []
+
+    } catch (err) {
+      console.error('💥 Error in getRandomMessages:', err)
+      error.value = err
+      return []
+    } finally {
+      loading.value = false
+    }
+  }
 
   return {
     // Estado reactivo
@@ -637,7 +665,8 @@ export const useSupabase = () => {
     // ✅ NUEVOS MÉTODOS PARA FILTRADO POR DÍA
     filterTasksByDay,
     restoreAllTasks,
-
+    // Nuevos métodos para mensajes de la tabla 'chibi_messages'
+    getRandomMessages,
     // Cliente directo para casos especiales
     supabase
   }
