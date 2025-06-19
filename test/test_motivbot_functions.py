@@ -80,6 +80,11 @@ class TestMotivbotRPCFunctions:
         assert 'completion_rate' in result
         assert 'active_tasks' in result
         
+        # ✅ NUEVO: Verificar estadísticas de tags
+        assert 'tags' in result
+        assert 'total_unique' in result['tags']
+        assert 'most_used' in result['tags']
+        
     def test_motivbot_create_task(self, supabase_config, headers, cleanup_tasks):
         """Test crear tarea por HTTP"""
         url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_create_task"
@@ -99,6 +104,34 @@ class TestMotivbotRPCFunctions:
         assert 'id' in result
         assert result['message'] == 'Task created successfully'
         
+        # ✅ NUEVO: Verificar campos relacionados con tags
+        assert 'tags_generated' in result
+        assert 'generated_tags' in result
+        
+        # 🧹 Agregar para cleanup
+        cleanup_tasks(result['id'])
+        
+    def test_motivbot_create_task_with_tags(self, supabase_config, headers, cleanup_tasks):
+        """✅ NUEVO: Test crear tarea con tags específicos"""
+        url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_create_task"
+        
+        payload = {
+            "p_title": "Task with Custom Tags - Cleanup",
+            "p_description": "Testing custom tags functionality",
+            "p_priority": "high",
+            "p_tags": ["test", "urgente", "desarrollo"]
+        }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        
+        assert response.status_code == 200
+        result = response.json()
+        
+        assert result['success'] is True
+        assert 'id' in result
+        assert result['tags_generated'] is False  # No generados automáticamente
+        assert result['generated_tags'] == ["test", "urgente", "desarrollo"]
+        
         # 🧹 Agregar para cleanup
         cleanup_tasks(result['id'])
         
@@ -112,6 +145,14 @@ class TestMotivbotRPCFunctions:
         result = response.json()
         
         assert isinstance(result, list)
+        
+        # ✅ NUEVO: Si hay tareas, verificar que incluyan tags
+        if len(result) > 0:
+            task = result[0]
+            assert 'id' in task
+            assert 'title' in task
+            # Verificar que tags esté presente (puede ser null/empty)
+            assert 'tags' in task
         
     def test_motivbot_get_tasks_with_filters(self, supabase_config, headers):
         """Test obtener tareas con filtros por HTTP"""
@@ -129,6 +170,41 @@ class TestMotivbotRPCFunctions:
         result = response.json()
         
         assert isinstance(result, list)
+        
+    def test_motivbot_get_tasks_by_tags(self, supabase_config, headers, cleanup_tasks):
+        """✅ NUEVO: Test filtrar tareas por tags"""
+        # Crear tarea con tags específicos
+        create_url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_create_task"
+        create_payload = {
+            "p_title": "Task for Tag Filter - Cleanup",
+            "p_tags": ["test-filter", "unique-tag"]
+        }
+        
+        create_response = requests.post(create_url, headers=headers, json=create_payload)
+        assert create_response.status_code == 200
+        task_result = create_response.json()
+        task_id = task_result['id']
+        
+        # 🧹 Agregar para cleanup
+        cleanup_tasks(task_id)
+        
+        # Filtrar por tags
+        filter_url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_get_tasks"
+        filter_payload = {
+            "p_tags": ["test-filter"],
+            "p_limit": 50
+        }
+        
+        response = requests.post(filter_url, headers=headers, json=filter_payload)
+        
+        assert response.status_code == 200
+        result = response.json()
+        
+        assert isinstance(result, list)
+        
+        # Verificar que al menos nuestra tarea esté en los resultados
+        task_ids = [task['id'] for task in result]
+        assert task_id in task_ids
         
     def test_motivbot_create_task_validation(self, supabase_config, headers):
         """Test validación al crear tarea sin título"""
@@ -182,6 +258,37 @@ class TestMotivbotRPCFunctions:
         assert result['success'] is True
         assert result['message'] == 'Task updated successfully'
         
+    def test_motivbot_update_task_tags(self, supabase_config, headers, cleanup_tasks):
+        """✅ NUEVO: Test actualizar tags de una tarea"""
+        # Crear tarea
+        create_url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_create_task"
+        create_payload = {
+            "p_title": "Task for Tags Update - Cleanup",
+            "p_tags": ["original", "tags"]
+        }
+        
+        create_response = requests.post(create_url, headers=headers, json=create_payload)
+        task_result = create_response.json()
+        task_id = task_result['id']
+        
+        # 🧹 Agregar para cleanup
+        cleanup_tasks(task_id)
+        
+        # Actualizar tags
+        update_url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_update_task"
+        update_payload = {
+            "p_task_id": task_id,
+            "p_tags": ["updated", "new-tags", "test"]
+        }
+        
+        response = requests.post(update_url, headers=headers, json=update_payload)
+        
+        assert response.status_code == 200
+        result = response.json()
+        
+        assert result['success'] is True
+        assert result['message'] == 'Task updated successfully'
+        
     def test_motivbot_delete_task(self, supabase_config, headers):
         """Test eliminar tarea por HTTP - Este test hace su propio cleanup"""
         # Primero crear una tarea
@@ -224,6 +331,40 @@ class TestMotivbotRPCFunctions:
         
         assert isinstance(result, list)
         
+    def test_motivbot_search_tasks_with_tags(self, supabase_config, headers, cleanup_tasks):
+        """✅ NUEVO: Test buscar tareas incluyendo búsqueda en tags"""
+        # Crear tarea con tag específico
+        create_url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_create_task"
+        create_payload = {
+            "p_title": "Task for Search - Cleanup",
+            "p_tags": ["searchable-tag", "unique-search"]
+        }
+        
+        create_response = requests.post(create_url, headers=headers, json=create_payload)
+        task_result = create_response.json()
+        task_id = task_result['id']
+        
+        # 🧹 Agregar para cleanup
+        cleanup_tasks(task_id)
+        
+        # Buscar por tag
+        search_url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_search_tasks"
+        search_payload = {
+            "p_search": "searchable-tag",
+            "p_search_tags": True
+        }
+        
+        response = requests.post(search_url, headers=headers, json=search_payload)
+        
+        assert response.status_code == 200
+        result = response.json()
+        
+        assert isinstance(result, list)
+        
+        # Verificar que nuestra tarea esté en los resultados
+        task_ids = [task['id'] for task in result]
+        assert task_id in task_ids
+        
     def test_motivbot_create_conversation(self, supabase_config, headers, cleanup_tasks):
         """Test crear conversación por HTTP"""
         # Primero crear una tarea
@@ -261,7 +402,6 @@ class TestMotivbotRPCFunctions:
         """Test obtener conversaciones por HTTP"""
         url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_get_conversations"
         
-        # ✅ Definir el payload que faltaba
         payload = {
             "p_limit": 50
         }
@@ -291,6 +431,133 @@ class TestMotivbotRPCFunctions:
         payload = {
             "p_task_id": task_id,
             "p_limit": 50
+        }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        
+        assert response.status_code == 200
+        result = response.json()
+        
+        assert isinstance(result, list)
+
+# ✅ NUEVA CLASE: Tests para funciones relacionadas con tags
+class TestMotivbotTagsFunctions:
+    
+    def test_motivbot_get_popular_tags(self, supabase_config, headers):
+        """✅ NUEVO: Test obtener tags populares"""
+        url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_get_popular_tags"
+        
+        payload = {
+            "p_limit": 10
+        }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        
+        assert response.status_code == 200
+        result = response.json()
+        
+        assert isinstance(result, list)
+        
+        # Si hay tags, verificar estructura
+        if len(result) > 0:
+            tag_item = result[0]
+            assert 'tag' in tag_item
+            assert 'count' in tag_item
+            assert isinstance(tag_item['count'], int)
+            
+    def test_motivbot_get_popular_tags_empty(self, supabase_config, headers):
+        """✅ NUEVO: Test obtener tags populares cuando no hay datos"""
+        url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_get_popular_tags"
+        
+        response = requests.post(url, headers=headers, json={})
+        
+        assert response.status_code == 200
+        result = response.json()
+        
+        # Siempre debe devolver una lista, aunque esté vacía
+        assert isinstance(result, list)
+        
+    def test_motivbot_get_motivational_messages(self, supabase_config, headers):
+        """✅ NUEVO: Test obtener mensajes motivacionales"""
+        url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_get_motivational_messages"
+        
+        payload = {
+            "p_limit": 5
+        }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        
+        assert response.status_code == 200
+        result = response.json()
+        
+        assert isinstance(result, list)
+        
+        # Si hay mensajes, verificar estructura
+        if len(result) > 0:
+            message = result[0]
+            assert 'id' in message
+            assert 'mensaje' in message
+            assert 'estado' in message
+            assert 'tags' in message
+            
+    def test_motivbot_get_motivational_messages_by_tags(self, supabase_config, headers):
+        """✅ NUEVO: Test obtener mensajes motivacionales por tags"""
+        url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_get_motivational_messages"
+        
+        payload = {
+            "p_tags": ["motivacional", "positivo"],
+            "p_limit": 3
+        }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        
+        assert response.status_code == 200
+        result = response.json()
+        
+        assert isinstance(result, list)
+        
+    def test_motivbot_get_motivational_messages_by_estado(self, supabase_config, headers):
+        """✅ NUEVO: Test obtener mensajes motivacionales por estado emocional"""
+        url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_get_motivational_messages"
+        
+        payload = {
+            "p_estado": "happy",
+            "p_limit": 5
+        }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        
+        assert response.status_code == 200
+        result = response.json()
+        
+        assert isinstance(result, list)
+        
+        # Si hay mensajes, verificar que el estado coincida
+        if len(result) > 0:
+            for message in result:
+                assert message['estado'] == 'happy'
+                
+    def test_motivbot_get_motivational_messages_by_task(self, supabase_config, headers, cleanup_tasks):
+        """✅ NUEVO: Test obtener mensajes motivacionales para una tarea específica"""
+        # Crear tarea con tags
+        create_url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_create_task"
+        create_payload = {
+            "p_title": "Task for Messages - Cleanup",
+            "p_tags": ["trabajo", "importante"]
+        }
+        
+        create_response = requests.post(create_url, headers=headers, json=create_payload)
+        task_result = create_response.json()
+        task_id = task_result['id']
+        
+        # 🧹 Agregar para cleanup
+        cleanup_tasks(task_id)
+        
+        # Obtener mensajes para esa tarea
+        url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_get_motivational_messages"
+        payload = {
+            "p_task_id": task_id,
+            "p_limit": 5
         }
         
         response = requests.post(url, headers=headers, json=payload)
@@ -338,5 +605,120 @@ class TestMotivbotErrorHandling:
         
         # Debería devolver error 404 o similar
         assert response.status_code == 404
+        
+    def test_motivbot_get_motivational_messages_invalid_task(self, supabase_config, headers):
+        """✅ NUEVO: Test mensajes motivacionales con task_id inválido"""
+        url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_get_motivational_messages"
+        
+        payload = {
+            "p_task_id": 99999999,  # ID que no existe
+            "p_limit": 5
+        }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        
+        # Puede devolver 200 con mensaje de error o lista vacía
+        assert response.status_code == 200
+        result = response.json()
+        
+        # Si devuelve error, verificar estructura
+        if isinstance(result, dict) and 'success' in result:
+            assert result['success'] is False
+        else:
+            # Si devuelve lista, puede estar vacía
+            assert isinstance(result, list)
+            
+    def test_motivbot_update_task_invalid_id(self, supabase_config, headers):
+        """✅ NUEVO: Test actualizar tarea con ID inválido"""
+        url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_update_task"
+        
+        payload = {
+            "p_task_id": 99999999,  # ID que no existe
+            "p_title": "Updated Title"
+        }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        
+        assert response.status_code == 200
+        result = response.json()
+        
+        assert result['success'] is False
+        assert 'not found' in result['message'].lower()
 
-# Test pipeline validation - PR #1
+# ✅ NUEVA CLASE: Tests de integración completa
+class TestMotivbotIntegration:
+    
+    def test_complete_task_lifecycle_with_tags(self, supabase_config, headers, cleanup_tasks):
+        """✅ NUEVO: Test ciclo completo de tarea con tags y mensajes"""
+        
+        # 1. Crear tarea con tags
+        create_url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_create_task"
+        create_payload = {
+            "p_title": "Integration Test Task - Cleanup",
+            "p_description": "Complete lifecycle test",
+            "p_priority": "high",
+            "p_tags": ["test", "integration", "high-priority"]
+        }
+        
+        create_response = requests.post(create_url, headers=headers, json=create_payload)
+        assert create_response.status_code == 200
+        create_result = create_response.json()
+        task_id = create_result['id']
+        
+        # 🧹 Agregar para cleanup
+        cleanup_tasks(task_id)
+        
+        # 2. Verificar que se creó con los tags correctos
+        get_url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_get_tasks"
+        get_payload = {"p_tags": ["integration"], "p_limit": 50}
+        
+        get_response = requests.post(get_url, headers=headers, json=get_payload)
+        assert get_response.status_code == 200
+        tasks = get_response.json()
+        
+        task_ids = [task['id'] for task in tasks]
+        assert task_id in task_ids
+        
+        # 3. Actualizar tags
+        update_url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_update_task"
+        update_payload = {
+            "p_task_id": task_id,
+            "p_tags": ["updated", "integration", "completed"]
+        }
+        
+        update_response = requests.post(update_url, headers=headers, json=update_payload)
+        assert update_response.status_code == 200
+        update_result = update_response.json()
+        assert update_result['success'] is True
+        
+        # 4. Buscar por los nuevos tags
+        search_url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_search_tasks"
+        search_payload = {
+            "p_search": "updated",
+            "p_search_tags": True
+        }
+        
+        search_response = requests.post(search_url, headers=headers, json=search_payload)
+        assert search_response.status_code == 200
+        search_results = search_response.json()
+        
+        search_task_ids = [task['id'] for task in search_results]
+        assert task_id in search_task_ids
+        
+        # 5. Obtener mensajes motivacionales para la tarea
+        messages_url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_get_motivational_messages"
+        messages_payload = {
+            "p_task_id": task_id,
+            "p_limit": 3
+        }
+        
+        messages_response = requests.post(messages_url, headers=headers, json=messages_payload)
+        assert messages_response.status_code == 200
+        messages_result = messages_response.json()
+        
+        # Debe devolver una lista (puede estar vacía si no hay mensajes)
+        assert isinstance(messages_result, list)
+        
+        print(f"✅ Integration test completed successfully for task {task_id}")
+
+# Test pipeline validation - PR #2 - Updated with Tags Support

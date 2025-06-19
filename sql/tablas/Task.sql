@@ -122,3 +122,12 @@ CREATE TRIGGER update_task_updated_at
     BEFORE UPDATE ON public.task
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- Agregar columna tags como array de texto
+-- 1. Crear el tipo ENUM (Supabase usa PostgreSQL, y ENUM debe definirse previamente)
+-- Agregar columna tags a la tabla existente
+ALTER TABLE public.task 
+ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}';
+
+-- Crear índice para búsquedas en tags
+CREATE INDEX IF NOT EXISTS idx_task_tags ON public.task USING GIN(tags);

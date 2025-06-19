@@ -997,7 +997,971 @@ BEGIN
 END;
 $$;
 
--- PERMISOS
+-- =====================================================
+-- FUNCIONES ADICIONALES PARA TAGS Y MENSAJES
+-- =====================================================
+
+-- 11. OBTENER TAREAS CON FILTRO DE TAGS (ACTUALIZADA)
+DROP FUNCTION IF EXISTS motivbot_get_tasks;
+CREATE FUNCTION motivbot_get_tasks(
+    p_status TEXT DEFAULT NULL,
+    p_priority TEXT DEFAULT NULL,
+    p_tags TEXT[] DEFAULT NULL,
+    p_limit INTEGER DEFAULT 50
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    result JSON;
+    has_created_at BOOLEAN := FALSE;
+    has_updated_at BOOLEAN := FALSE;
+    has_due_date BOOLEAN := FALSE;
+    has_due_time BOOLEAN := FALSE;
+    has_priority BOOLEAN := FALSE;
+    has_tags BOOLEAN := FALSE;
+BEGIN
+    -- Verificar qué columnas existen
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'created_at'
+    ) INTO has_created_at;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'updated_at'
+    ) INTO has_updated_at;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'due_date'
+    ) INTO has_due_date;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'due_time'
+    ) INTO has_due_time;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'priority'
+    ) INTO has_priority;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'tags'
+    ) INTO has_tags;
+
+    -- Construir query con filtros de tags
+    IF p_status IS NOT NULL AND p_priority IS NOT NULL AND p_tags IS NOT NULL AND has_priority AND has_tags THEN
+        -- Filtrar por status, priority y tags
+        EXECUTE format('
+            SELECT COALESCE(json_agg(task_json), ''[]''::json)
+            FROM (
+                SELECT json_build_object(
+                    ''id'', id,
+                    ''title'', title,
+                    ''description'', description,
+                    ''status'', status%s%s%s%s%s%s
+                ) as task_json
+                FROM public.task 
+                WHERE status = $1::task_status AND priority = $2 AND tags && $3
+                ORDER BY %s
+                LIMIT $4
+            ) tasks',
+            CASE WHEN has_priority THEN ', ''priority'', priority' ELSE '' END,
+            CASE WHEN has_tags THEN ', ''tags'', tags' ELSE '' END,
+            CASE WHEN has_due_date THEN ', ''due_date'', due_date' ELSE '' END,
+            CASE WHEN has_due_time THEN ', ''due_time'', due_time' ELSE '' END,
+            CASE WHEN has_created_at THEN ', ''created_at'', created_at' ELSE '' END,
+            CASE WHEN has_updated_at THEN ', ''updated_at'', updated_at' ELSE '' END,
+            CASE WHEN has_created_at THEN 'created_at DESC' ELSE 'id DESC' END
+        ) USING p_status, p_priority, p_tags, p_limit INTO result;
+        
+    ELSIF p_tags IS NOT NULL AND has_tags THEN
+        -- Filtrar solo por tags
+        EXECUTE format('
+            SELECT COALESCE(json_agg(task_json), ''[]''::json)
+            FROM (
+                SELECT json_build_object(
+                    ''id'', id,
+                    ''title'', title,
+                    ''description'', description,
+                    ''status'', status%s%s%s%s%s%s
+                ) as task_json
+                FROM public.task 
+                WHERE tags && $1
+                ORDER BY %s
+                LIMIT $2
+            ) tasks',
+            CASE WHEN has_priority THEN ', ''priority'', priority' ELSE '' END,
+            CASE WHEN has_tags THEN ', ''tags'', tags' ELSE '' END,
+            CASE WHEN has_due_date THEN ', ''due_date'', due_date' ELSE '' END,
+            CASE WHEN has_due_time THEN ', ''due_time'', due_time' ELSE '' END,
+            CASE WHEN has_created_at THEN ', ''created_at'', created_at' ELSE '' END,
+            CASE WHEN has_updated_at THEN ', ''updated_at'', updated_at' ELSE '' END,
+            CASE WHEN has_created_at THEN 'created_at DESC' ELSE 'id DESC' END
+        ) USING p_tags, p_limit INTO result;
+        
+    ELSIF p_status IS NOT NULL AND p_priority IS NOT NULL AND has_priority THEN
+        -- Filtrar por status y priority (sin tags)
+        EXECUTE format('
+            SELECT COALESCE(json_agg(task_json), ''[]''::json)
+            FROM (
+                SELECT json_build_object(
+                    ''id'', id,
+                    ''title'', title,
+                    ''description'', description,
+                    ''status'', status%s%s%s%s%s%s
+                ) as task_json
+                FROM public.task 
+                WHERE status = $1::task_status AND priority = $2
+                ORDER BY %s
+                LIMIT $3
+            ) tasks',
+            CASE WHEN has_priority THEN ', ''priority'', priority' ELSE '' END,
+            CASE WHEN has_tags THEN ', ''tags'', tags' ELSE '' END,
+            CASE WHEN has_due_date THEN ', ''due_date'', due_date' ELSE '' END,
+            CASE WHEN has_due_time THEN ', ''due_time'', due_time' ELSE '' END,
+            CASE WHEN has_created_at THEN ', ''created_at'', created_at' ELSE '' END,
+            CASE WHEN has_updated_at THEN ', ''updated_at'', updated_at' ELSE '' END,
+            CASE WHEN has_created_at THEN 'created_at DESC' ELSE 'id DESC' END
+        ) USING p_status, p_priority, p_limit INTO result;
+        
+    ELSIF p_status IS NOT NULL THEN
+        -- Filtrar solo por status
+        EXECUTE format('
+            SELECT COALESCE(json_agg(task_json), ''[]''::json)
+            FROM (
+                SELECT json_build_object(
+                    ''id'', id,
+                    ''title'', title,
+                    ''description'', description,
+                    ''status'', status%s%s%s%s%s%s
+                ) as task_json
+                FROM public.task 
+                WHERE status = $1::task_status
+                ORDER BY %s
+                LIMIT $2
+            ) tasks',
+            CASE WHEN has_priority THEN ', ''priority'', priority' ELSE '' END,
+            CASE WHEN has_tags THEN ', ''tags'', tags' ELSE '' END,
+            CASE WHEN has_due_date THEN ', ''due_date'', due_date' ELSE '' END,
+            CASE WHEN has_due_time THEN ', ''due_time'', due_time' ELSE '' END,
+            CASE WHEN has_created_at THEN ', ''created_at'', created_at' ELSE '' END,
+            CASE WHEN has_updated_at THEN ', ''updated_at'', updated_at' ELSE '' END,
+            CASE WHEN has_created_at THEN 'created_at DESC' ELSE 'id DESC' END
+        ) USING p_status, p_limit INTO result;
+        
+    ELSIF p_priority IS NOT NULL AND has_priority THEN
+        -- Filtrar solo por priority
+        EXECUTE format('
+            SELECT COALESCE(json_agg(task_json), ''[]''::json)
+            FROM (
+                SELECT json_build_object(
+                    ''id'', id,
+                    ''title'', title,
+                    ''description'', description,
+                    ''status'', status%s%s%s%s%s%s
+                ) as task_json
+                FROM public.task 
+                WHERE priority = $1
+                ORDER BY %s
+                LIMIT $2
+            ) tasks',
+            CASE WHEN has_priority THEN ', ''priority'', priority' ELSE '' END,
+            CASE WHEN has_tags THEN ', ''tags'', tags' ELSE '' END,
+            CASE WHEN has_due_date THEN ', ''due_date'', due_date' ELSE '' END,
+            CASE WHEN has_due_time THEN ', ''due_time'', due_time' ELSE '' END,
+            CASE WHEN has_created_at THEN ', ''created_at'', created_at' ELSE '' END,
+            CASE WHEN has_updated_at THEN ', ''updated_at'', updated_at' ELSE '' END,
+            CASE WHEN has_created_at THEN 'created_at DESC' ELSE 'id DESC' END
+        ) USING p_priority, p_limit INTO result;
+        
+    ELSE
+        -- Sin filtros
+        EXECUTE format('
+            SELECT COALESCE(json_agg(task_json), ''[]''::json)
+            FROM (
+                SELECT json_build_object(
+                    ''id'', id,
+                    ''title'', title,
+                    ''description'', description,
+                    ''status'', status%s%s%s%s%s%s
+                ) as task_json
+                FROM public.task 
+                ORDER BY %s
+                LIMIT $1
+            ) tasks',
+            CASE WHEN has_priority THEN ', ''priority'', priority' ELSE '' END,
+            CASE WHEN has_tags THEN ', ''tags'', tags' ELSE '' END,
+            CASE WHEN has_due_date THEN ', ''due_date'', due_date' ELSE '' END,
+            CASE WHEN has_due_time THEN ', ''due_time'', due_time' ELSE '' END,
+            CASE WHEN has_created_at THEN ', ''created_at'', created_at' ELSE '' END,
+            CASE WHEN has_updated_at THEN ', ''updated_at'', updated_at' ELSE '' END,
+            CASE WHEN has_created_at THEN 'created_at DESC' ELSE 'id DESC' END
+        ) USING p_limit INTO result;
+    END IF;
+    
+    RETURN result;
+END;
+$$;
+
+-- 12. CREAR TAREA CON TAGS (ACTUALIZADA)
+DROP FUNCTION IF EXISTS motivbot_create_task;
+CREATE FUNCTION motivbot_create_task(
+    p_title TEXT,
+    p_description TEXT DEFAULT NULL,
+    p_priority TEXT DEFAULT 'normal',
+    p_due_date DATE DEFAULT NULL,
+    p_due_time TIME DEFAULT NULL,
+    p_tags TEXT[] DEFAULT NULL
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    new_task_id BIGINT;
+    result JSON;
+    insert_query TEXT;
+    has_priority BOOLEAN := FALSE;
+    has_due_date BOOLEAN := FALSE;
+    has_due_time BOOLEAN := FALSE;
+    has_tags BOOLEAN := FALSE;
+BEGIN
+    -- Validar título
+    IF p_title IS NULL OR trim(p_title) = '' THEN
+        RETURN json_build_object(
+            'success', false,
+            'message', 'Title is required'
+        );
+    END IF;
+    
+    -- Verificar qué columnas existen
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'priority'
+    ) INTO has_priority;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'due_date'
+    ) INTO has_due_date;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'due_time'
+    ) INTO has_due_time;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'tags'
+    ) INTO has_tags;
+    
+    -- Construir query de inserción dinámicamente
+    insert_query := 'INSERT INTO public.task (title, description';
+    
+    IF has_priority THEN
+        insert_query := insert_query || ', priority';
+    END IF;
+    
+    IF has_due_date THEN
+        insert_query := insert_query || ', due_date';
+    END IF;
+    
+    IF has_due_time THEN
+        insert_query := insert_query || ', due_time';
+    END IF;
+    
+    IF has_tags THEN
+        insert_query := insert_query || ', tags';
+    END IF;
+    
+    insert_query := insert_query || ') VALUES ($1, $2';
+    
+    IF has_priority THEN
+        insert_query := insert_query || ', $3';
+    END IF;
+    
+    IF has_due_date THEN
+        IF has_priority THEN
+            insert_query := insert_query || ', $4';
+        ELSE
+            insert_query := insert_query || ', $3';
+        END IF;
+    END IF;
+    
+    IF has_due_time THEN
+        IF has_priority AND has_due_date THEN
+            insert_query := insert_query || ', $5';
+        ELSIF has_priority OR has_due_date THEN
+            insert_query := insert_query || ', $4';
+        ELSE
+            insert_query := insert_query || ', $3';
+        END IF;
+    END IF;
+    
+    IF has_tags THEN
+        IF has_priority AND has_due_date AND has_due_time THEN
+            insert_query := insert_query || ', $6';
+        ELSIF (has_priority AND has_due_date) OR (has_priority AND has_due_time) OR (has_due_date AND has_due_time) THEN
+            insert_query := insert_query || ', $5';
+        ELSIF has_priority OR has_due_date OR has_due_time THEN
+            insert_query := insert_query || ', $4';
+        ELSE
+            insert_query := insert_query || ', $3';
+        END IF;
+    END IF;
+    
+    insert_query := insert_query || ') RETURNING id';
+    
+    -- Ejecutar inserción según columnas disponibles
+    IF has_priority AND has_due_date AND has_due_time AND has_tags THEN
+        EXECUTE insert_query USING trim(p_title), NULLIF(trim(p_description), ''), p_priority, p_due_date, p_due_time, p_tags INTO new_task_id;
+    ELSIF has_priority AND has_due_date AND has_tags THEN
+        EXECUTE insert_query USING trim(p_title), NULLIF(trim(p_description), ''), p_priority, p_due_date, p_tags INTO new_task_id;
+    ELSIF has_priority AND has_due_time AND has_tags THEN
+        EXECUTE insert_query USING trim(p_title), NULLIF(trim(p_description), ''), p_priority, p_due_time, p_tags INTO new_task_id;
+    ELSIF has_due_date AND has_due_time AND has_tags THEN
+        EXECUTE insert_query USING trim(p_title), NULLIF(trim(p_description), ''), p_due_date, p_due_time, p_tags INTO new_task_id;
+    ELSIF has_priority AND has_tags THEN
+        EXECUTE insert_query USING trim(p_title), NULLIF(trim(p_description), ''), p_priority, p_tags INTO new_task_id;
+    ELSIF has_due_date AND has_tags THEN
+        EXECUTE insert_query USING trim(p_title), NULLIF(trim(p_description), ''), p_due_date, p_tags INTO new_task_id;
+    ELSIF has_due_time AND has_tags THEN
+        EXECUTE insert_query USING trim(p_title), NULLIF(trim(p_description), ''), p_due_time, p_tags INTO new_task_id;
+    ELSIF has_tags THEN
+        EXECUTE insert_query USING trim(p_title), NULLIF(trim(p_description), ''), p_tags INTO new_task_id;
+    ELSIF has_priority AND has_due_date AND has_due_time THEN
+        EXECUTE insert_query USING trim(p_title), NULLIF(trim(p_description), ''), p_priority, p_due_date, p_due_time INTO new_task_id;
+    ELSIF has_priority AND has_due_date THEN
+        EXECUTE insert_query USING trim(p_title), NULLIF(trim(p_description), ''), p_priority, p_due_date INTO new_task_id;
+    ELSIF has_priority AND has_due_time THEN
+        EXECUTE insert_query USING trim(p_title), NULLIF(trim(p_description), ''), p_priority, p_due_time INTO new_task_id;
+    ELSIF has_priority THEN
+        EXECUTE insert_query USING trim(p_title), NULLIF(trim(p_description), ''), p_priority INTO new_task_id;
+    ELSIF has_due_date AND has_due_time THEN
+        EXECUTE insert_query USING trim(p_title), NULLIF(trim(p_description), ''), p_due_date, p_due_time INTO new_task_id;
+    ELSIF has_due_date THEN
+        EXECUTE insert_query USING trim(p_title), NULLIF(trim(p_description), ''), p_due_date INTO new_task_id;
+    ELSIF has_due_time THEN
+        EXECUTE insert_query USING trim(p_title), NULLIF(trim(p_description), ''), p_due_time INTO new_task_id;
+    ELSE
+        EXECUTE insert_query USING trim(p_title), NULLIF(trim(p_description), '') INTO new_task_id;
+    END IF;
+    
+    SELECT json_build_object(
+        'success', true,
+        'id', new_task_id,
+        'message', 'Task created successfully',
+        'tags_generated', CASE WHEN p_tags IS NULL THEN true ELSE false END,
+        'generated_tags', COALESCE(p_tags, ARRAY[]::TEXT[])
+    ) INTO result;
+    
+    RETURN result;
+END;
+$$;
+
+-- 13. ACTUALIZAR TAREA CON TAGS (ACTUALIZADA)
+DROP FUNCTION IF EXISTS motivbot_update_task;
+CREATE FUNCTION motivbot_update_task(
+    p_task_id BIGINT,
+    p_title TEXT DEFAULT NULL,
+    p_description TEXT DEFAULT NULL,
+    p_status TEXT DEFAULT NULL,
+    p_priority TEXT DEFAULT NULL,
+    p_due_date DATE DEFAULT NULL,
+    p_due_time TIME DEFAULT NULL,
+    p_tags TEXT[] DEFAULT NULL
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    result JSON;
+    update_query TEXT;
+    has_priority BOOLEAN := FALSE;
+    has_due_date BOOLEAN := FALSE;
+    has_due_time BOOLEAN := FALSE;
+    has_updated_at BOOLEAN := FALSE;
+    has_tags BOOLEAN := FALSE;
+BEGIN
+    -- Verificar que la tarea existe
+    IF NOT EXISTS (SELECT 1 FROM public.task WHERE id = p_task_id) THEN
+        RETURN json_build_object(
+            'success', false,
+            'message', 'Task not found'
+        );
+    END IF;
+    
+    -- Verificar qué columnas existen
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'priority'
+    ) INTO has_priority;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'due_date'
+    ) INTO has_due_date;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'due_time'
+    ) INTO has_due_time;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'updated_at'
+    ) INTO has_updated_at;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'tags'
+    ) INTO has_tags;
+    
+    -- Construir query de actualización dinámicamente
+    update_query := 'UPDATE public.task SET
+        title = CASE 
+            WHEN $2 IS NOT NULL AND trim($2) != '''' THEN trim($2) 
+            ELSE title 
+        END,
+        description = CASE 
+            WHEN $3 IS NOT NULL THEN NULLIF(trim($3), '''') 
+            ELSE description 
+        END,
+        status = CASE 
+            WHEN $4 IS NOT NULL THEN $4::task_status 
+            ELSE status 
+        END';
+    
+    -- Agregar campos opcionales si existen
+    IF has_priority THEN
+        update_query := update_query || ',
+
+        priority = CASE 
+            WHEN $5 IS NOT NULL AND $5 IN (''low'', ''normal'', ''medium'', ''high'') THEN $5 
+            ELSE priority 
+        END';
+    END IF;
+    
+    IF has_due_date THEN
+        update_query := update_query || ',
+        due_date = CASE 
+            WHEN $6 IS NOT NULL THEN $6 
+            ELSE due_date 
+        END';
+    END IF;
+    
+    IF has_due_time THEN
+        update_query := update_query || ',
+        due_time = CASE 
+            WHEN $7 IS NOT NULL THEN $7 
+            ELSE due_time 
+        END';
+    END IF;
+    
+    IF has_tags THEN
+        update_query := update_query || ',
+        tags = CASE 
+            WHEN $8 IS NOT NULL THEN $8 
+            ELSE tags 
+        END';
+    END IF;
+    
+    IF has_updated_at THEN
+        update_query := update_query || ',
+        updated_at = NOW()';
+    END IF;
+    
+    update_query := update_query || ' WHERE id = $1';
+    
+    -- Ejecutar actualización
+    EXECUTE update_query USING p_task_id, p_title, p_description, p_status, p_priority, p_due_date, p_due_time, p_tags;
+    
+    RETURN json_build_object(
+        'success', true,
+        'message', 'Task updated successfully'
+    );
+END;
+$$;
+
+-- 14. OBTENER TAGS POPULARES
+CREATE FUNCTION motivbot_get_popular_tags(
+    p_limit INTEGER DEFAULT 20
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    result JSON;
+    has_tags BOOLEAN := FALSE;
+BEGIN
+    -- Verificar si existe la columna tags
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'tags'
+    ) INTO has_tags;
+    
+    IF NOT has_tags THEN
+        RETURN json_build_array();
+    END IF;
+    
+    -- Obtener tags más utilizados
+    SELECT json_agg(
+        json_build_object(
+            'tag', tag,
+            'count', tag_count
+        ) ORDER BY tag_count DESC
+    ) INTO result
+    FROM (
+        SELECT 
+            unnest(tags) as tag,
+            COUNT(*) as tag_count
+        FROM public.task 
+        WHERE tags IS NOT NULL AND array_length(tags, 1) > 0
+        GROUP BY unnest(tags)
+        ORDER BY COUNT(*) DESC
+        LIMIT p_limit
+    ) popular_tags;
+    
+    RETURN COALESCE(result, json_build_array());
+END;
+$$;
+
+-- 15. OBTENER MENSAJES MOTIVACIONALES
+CREATE FUNCTION motivbot_get_motivational_messages(
+    p_task_id BIGINT DEFAULT NULL,
+    p_tags TEXT[] DEFAULT NULL,
+    p_estado TEXT DEFAULT NULL,
+    p_limit INTEGER DEFAULT 5
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    result JSON;
+    task_tags TEXT[];
+    has_chibi_messages BOOLEAN := FALSE;
+BEGIN
+    -- Verificar si existe la tabla chibi_messages
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'chibi_messages'
+    ) INTO has_chibi_messages;
+    
+    IF NOT has_chibi_messages THEN
+        RETURN json_build_array();
+    END IF;
+    
+    -- Si se proporciona task_id, obtener tags de la tarea
+    IF p_task_id IS NOT NULL THEN
+        SELECT tags INTO task_tags
+        FROM public.task 
+        WHERE id = p_task_id;
+        
+        IF NOT FOUND THEN
+            RETURN json_build_object(
+                'success', false,
+                'message', 'Task not found'
+            );
+        END IF;
+        
+        -- Usar tags de la tarea si no se proporcionaron tags específicos
+        IF p_tags IS NULL THEN
+            p_tags := task_tags;
+        END IF;
+    END IF;
+    
+    -- Construir query según filtros
+    IF p_tags IS NOT NULL AND p_estado IS NOT NULL THEN
+        -- Filtrar por tags y estado
+        SELECT json_agg(
+            json_build_object(
+                'id', id,
+                'mensaje', mensaje,
+                'estado', estado,
+                'tags', tags,
+                'created_at', created_at
+            ) ORDER BY RANDOM()
+        ) INTO result
+        FROM (
+            SELECT id, mensaje, estado, tags, created_at
+            FROM public.chibi_messages 
+            WHERE tags && p_tags AND estado = p_estado
+            LIMIT p_limit
+        ) messages;
+        
+    ELSIF p_tags IS NOT NULL THEN
+        -- Filtrar solo por tags
+        SELECT json_agg(
+            json_build_object(
+                'id', id,
+                'mensaje', mensaje,
+                'estado', estado,
+                'tags', tags,
+                'created_at', created_at
+            ) ORDER BY RANDOM()
+        ) INTO result
+        FROM (
+            SELECT id, mensaje, estado, tags, created_at
+            FROM public.chibi_messages 
+            WHERE tags && p_tags
+            ORDER BY RANDOM()
+            LIMIT p_limit
+        ) messages;
+        
+    ELSIF p_estado IS NOT NULL THEN
+        -- Filtrar solo por estado
+        SELECT json_agg(
+            json_build_object(
+                'id', id,
+                'mensaje', mensaje,
+                'estado', estado,
+                'tags', tags,
+                'created_at', created_at
+            ) ORDER BY RANDOM()
+        ) INTO result
+        FROM (
+            SELECT id, mensaje, estado, tags, created_at
+            FROM public.chibi_messages 
+            WHERE estado = p_estado
+            ORDER BY RANDOM()
+            LIMIT p_limit
+        ) messages;
+        
+    ELSE
+        -- Sin filtros, mensajes aleatorios
+        SELECT json_agg(
+            json_build_object(
+                'id', id,
+                'mensaje', mensaje,
+                'estado', estado,
+                'tags', tags,
+                'created_at', created_at
+            ) ORDER BY RANDOM()
+        ) INTO result
+        FROM (
+            SELECT id, mensaje, estado, tags, created_at
+            FROM public.chibi_messages 
+            ORDER BY RANDOM()
+            LIMIT p_limit
+        ) messages;
+    END IF;
+    
+    RETURN COALESCE(result, json_build_array());
+END;
+$$;
+
+-- 16. BUSCAR TAREAS CON TAGS (ACTUALIZADA)
+DROP FUNCTION IF EXISTS motivbot_search_tasks;
+CREATE FUNCTION motivbot_search_tasks(
+    p_search TEXT,
+    p_status TEXT DEFAULT NULL,
+    p_priority TEXT DEFAULT NULL,
+    p_search_tags BOOLEAN DEFAULT true
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    result JSON;
+    has_created_at BOOLEAN := FALSE;
+    has_updated_at BOOLEAN := FALSE;
+    has_due_date BOOLEAN := FALSE;
+    has_due_time BOOLEAN := FALSE;
+    has_priority BOOLEAN := FALSE;
+    has_tags BOOLEAN := FALSE;
+BEGIN
+    -- Validar parámetro de búsqueda
+    IF p_search IS NULL OR trim(p_search) = '' THEN
+        RETURN json_build_object(
+            'success', false,
+            'message', 'Search term is required'
+        );
+    END IF;
+    
+    -- Verificar qué columnas existen
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'created_at'
+    ) INTO has_created_at;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'updated_at'
+    ) INTO has_updated_at;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'due_date'
+    ) INTO has_due_date;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'due_time'
+    ) INTO has_due_time;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'priority'
+    ) INTO has_priority;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'tags'
+    ) INTO has_tags;
+
+    -- Construir condición de búsqueda
+    -- Incluir búsqueda en tags si está habilitada y la columna existe
+    IF p_search_tags AND has_tags THEN
+        -- Búsqueda en título, descripción y tags
+        IF p_status IS NOT NULL AND p_priority IS NOT NULL AND has_priority THEN
+            EXECUTE format('
+                SELECT COALESCE(json_agg(task_json), ''[]''::json)
+                FROM (
+                    SELECT json_build_object(
+                        ''id'', id,
+                        ''title'', title,
+                        ''description'', description,
+                        ''status'', status%s%s%s%s%s%s
+                    ) as task_json
+                    FROM public.task 
+                    WHERE (title ILIKE $1 OR description ILIKE $1 OR array_to_string(tags, '' '') ILIKE $1)
+                    AND status = $2::task_status 
+                    AND priority = $3
+                    ORDER BY %s
+                ) tasks',
+                CASE WHEN has_priority THEN ', ''priority'', priority' ELSE '' END,
+                CASE WHEN has_tags THEN ', ''tags'', tags' ELSE '' END,
+                CASE WHEN has_due_date THEN ', ''due_date'', due_date' ELSE '' END,
+                CASE WHEN has_due_time THEN ', ''due_time'', due_time' ELSE '' END,
+                CASE WHEN has_created_at THEN ', ''created_at'', created_at' ELSE '' END,
+                CASE WHEN has_updated_at THEN ', ''updated_at'', updated_at' ELSE '' END,
+                CASE WHEN has_created_at THEN 'created_at DESC' ELSE 'id DESC' END
+            ) USING '%' || trim(p_search) || '%', p_status, p_priority INTO result;
+        ELSE
+            EXECUTE format('
+                SELECT COALESCE(json_agg(task_json), ''[]''::json)
+                FROM (
+                    SELECT json_build_object(
+                        ''id'', id,
+                        ''title'', title,
+                        ''description'', description,
+                        ''status'', status%s%s%s%s%s%s
+                    ) as task_json
+                    FROM public.task 
+                    WHERE title ILIKE $1 OR description ILIKE $1 OR array_to_string(tags, '' '') ILIKE $1
+                    ORDER BY %s
+                ) tasks',
+                CASE WHEN has_priority THEN ', ''priority'', priority' ELSE '' END,
+                CASE WHEN has_tags THEN ', ''tags'', tags' ELSE '' END,
+                CASE WHEN has_due_date THEN ', ''due_date'', due_date' ELSE '' END,
+                CASE WHEN has_due_time THEN ', ''due_time'', due_time' ELSE '' END,
+                CASE WHEN has_created_at THEN ', ''created_at'', created_at' ELSE '' END,
+                CASE WHEN has_updated_at THEN ', ''updated_at'', updated_at' ELSE '' END,
+                CASE WHEN has_created_at THEN 'created_at DESC' ELSE 'id DESC' END
+            ) USING '%' || trim(p_search) || '%' INTO result;
+        END IF;
+    ELSE
+        -- Búsqueda solo en título y descripción (código original)
+        IF p_status IS NOT NULL AND p_priority IS NOT NULL AND has_priority THEN
+            EXECUTE format('
+                SELECT COALESCE(json_agg(task_json), ''[]''::json)
+                FROM (
+                    SELECT json_build_object(
+                        ''id'', id,
+                        ''title'', title,
+                        ''description'', description,
+                        ''status'', status%s%s%s%s%s%s
+                    ) as task_json
+                    FROM public.task 
+                    WHERE (title ILIKE $1 OR description ILIKE $1) 
+                    AND status = $2::task_status 
+                    AND priority = $3
+                    ORDER BY %s
+                ) tasks',
+                CASE WHEN has_priority THEN ', ''priority'', priority' ELSE '' END,
+                CASE WHEN has_tags THEN ', ''tags'', tags' ELSE '' END,
+                CASE WHEN has_due_date THEN ', ''due_date'', due_date' ELSE '' END,
+                CASE WHEN has_due_time THEN ', ''due_time'', due_time' ELSE '' END,
+                CASE WHEN has_created_at THEN ', ''created_at'', created_at' ELSE '' END,
+                CASE WHEN has_updated_at THEN ', ''updated_at'', updated_at' ELSE '' END,
+                CASE WHEN has_created_at THEN 'created_at DESC' ELSE 'id DESC' END
+            ) USING '%' || trim(p_search) || '%', p_status, p_priority INTO result;
+        ELSE
+            EXECUTE format('
+                SELECT COALESCE(json_agg(task_json), ''[]''::json)
+                FROM (
+                    SELECT json_build_object(
+                        ''id'', id,
+                        ''title'', title,
+                        ''description'', description,
+                        ''status'', status%s%s%s%s%s%s
+                    ) as task_json
+                    FROM public.task 
+                    WHERE title ILIKE $1 OR description ILIKE $1
+                    ORDER BY %s
+                ) tasks',
+                CASE WHEN has_priority THEN ', ''priority'', priority' ELSE '' END,
+                CASE WHEN has_tags THEN ', ''tags'', tags' ELSE '' END,
+                CASE WHEN has_due_date THEN ', ''due_date'', due_date' ELSE '' END,
+                CASE WHEN has_due_time THEN ', ''due_time'', due_time' ELSE '' END,
+                CASE WHEN has_created_at THEN ', ''created_at'', created_at' ELSE '' END,
+                CASE WHEN has_updated_at THEN ', ''updated_at'', updated_at' ELSE '' END,
+                CASE WHEN has_created_at THEN 'created_at DESC' ELSE 'id DESC' END
+            ) USING '%' || trim(p_search) || '%' INTO result;
+        END IF;
+    END IF;
+    
+    RETURN result;
+END;
+$$;
+
+-- 17. DASHBOARD CON ESTADÍSTICAS DE TAGS (ACTUALIZADO)
+DROP FUNCTION IF EXISTS motivbot_get_dashboard;
+CREATE FUNCTION motivbot_get_dashboard()
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    result JSON;
+    task_stats JSON;
+    conversation_stats JSON;
+    tag_stats JSON;
+    completion_rate NUMERIC;
+    active_tasks INTEGER;
+    has_tags BOOLEAN := FALSE;
+    has_chibi_messages BOOLEAN := FALSE;
+BEGIN
+    -- Verificar si existe la columna tags
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'task' AND column_name = 'tags'
+    ) INTO has_tags;
+    
+    -- Verificar si existe la tabla chibi_messages
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'chibi_messages'
+    ) INTO has_chibi_messages;
+    
+    -- Estadísticas de tareas
+    SELECT json_build_object(
+        'total', COUNT(*),
+        'pending', COUNT(*) FILTER (WHERE status = 'pending'),
+        'in_progress', COUNT(*) FILTER (WHERE status = 'in-progress'), 
+        'on_hold', COUNT(*) FILTER (WHERE status = 'on-hold'),
+        'completed', COUNT(*) FILTER (WHERE status = 'completed'),
+        'cancelled', COUNT(*) FILTER (WHERE status = 'cancelled'),
+        'high_priority', CASE 
+            WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'task' AND column_name = 'priority') 
+            THEN (SELECT COUNT(*) FROM public.task WHERE priority = 'high')
+            ELSE 0 
+        END,
+        'overdue', CASE 
+            WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'task' AND column_name = 'due_date') 
+            THEN (SELECT COUNT(*) FROM public.task WHERE due_date < CURRENT_DATE AND status NOT IN ('completed', 'cancelled'))
+            ELSE 0 
+        END
+    ) INTO task_stats
+    FROM public.task;
+    
+    -- Estadísticas de conversaciones (si la tabla existe)
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'conversation') THEN
+        SELECT json_build_object(
+            'total', COUNT(*),
+            'user_messages', COUNT(*) FILTER (WHERE role = 'user'),
+            'assistant_messages', COUNT(*) FILTER (WHERE role = 'assistant'),
+            'total_tokens', CASE 
+                WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'conversation' AND column_name = 'tokens_used') 
+                THEN (SELECT COALESCE(SUM(tokens_used), 0) FROM public.conversation)
+                ELSE 0 
+            END,
+            'grateful_responses', COUNT(*) FILTER (WHERE user_is_grateful = true)
+        ) INTO conversation_stats
+        FROM public.conversation;
+    ELSE
+        conversation_stats := json_build_object(
+            'total', 0,
+            'user_messages', 0,
+            'assistant_messages', 0,
+            'total_tokens', 0,
+            'grateful_responses', 0
+        );
+    END IF;
+    
+    -- Estadísticas de tags
+    IF has_tags THEN
+        SELECT json_build_object(
+            'total_unique', COALESCE(tag_count.unique_tags, 0),
+            'most_used', COALESCE(popular_tags.tags_array, json_build_array())
+        ) INTO tag_stats
+        FROM (
+            SELECT COUNT(DISTINCT tag) as unique_tags
+            FROM (
+                SELECT unnest(tags) as tag
+                FROM public.task 
+                WHERE tags IS NOT NULL AND array_length(tags, 1) > 0
+            ) all_tags
+        ) tag_count
+        CROSS JOIN (
+            SELECT json_agg(
+                json_build_object('tag', tag, 'count', tag_count) 
+                ORDER BY tag_count DESC
+            ) as tags_array
+            FROM (
+                SELECT 
+                    unnest(tags) as tag,
+                    COUNT(*) as tag_count
+                FROM public.task 
+                WHERE tags IS NOT NULL AND array_length(tags, 1) > 0
+                GROUP BY unnest(tags)
+                ORDER BY COUNT(*) DESC
+                LIMIT 5
+            ) top_tags
+        ) popular_tags;
+    ELSE
+        tag_stats := json_build_object(
+            'total_unique', 0,
+            'most_used', json_build_array()
+        );
+    END IF;
+    
+    -- Tasa de completación
+    SELECT CASE 
+        WHEN COUNT(*) > 0 THEN 
+            ROUND((COUNT(*) FILTER (WHERE status = 'completed')::NUMERIC / COUNT(*)) * 100, 2)
+        ELSE 0 
+    END INTO completion_rate
+    FROM public.task;
+    
+    -- Tareas activas
+    SELECT COUNT(*) INTO active_tasks
+    FROM public.task 
+    WHERE status IN ('pending', 'in-progress', 'on-hold');
+    
+    -- Construir resultado final
+    SELECT json_build_object(
+        'tasks', task_stats,
+        'conversations', conversation_stats,
+        'tags', tag_stats,
+        'completion_rate', completion_rate,
+        'active_tasks', active_tasks
+    ) INTO result;
+    
+    RETURN result;
+END;
+$$;
+
+-- ACTUALIZAR PERMISOS PARA TODAS LAS FUNCIONES
 GRANT EXECUTE ON FUNCTION motivbot_get_tasks TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION motivbot_create_task TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION motivbot_update_task TO anon, authenticated;
@@ -1008,3 +1972,5 @@ GRANT EXECUTE ON FUNCTION motivbot_update_conversation_feedback TO anon, authent
 GRANT EXECUTE ON FUNCTION motivbot_delete_conversation TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION motivbot_search_tasks TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION motivbot_get_dashboard TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION motivbot_get_popular_tags TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION motivbot_get_motivational_messages TO anon, authenticated;
