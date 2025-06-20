@@ -601,7 +601,6 @@ const addComment = async () => {
         tokensUsed: aiResponse.usage?.total_tokens || 0,
         responseTime: aiResponse.responseTime,
         modelUsed: 'gpt-3.5-turbo',
-        suggestions: aiResponse.suggestions,
         isUseful: false,
         isPrecise: false,
         isGrateful: false
@@ -669,7 +668,6 @@ const askAI = async (commentContent) => {
       tokensUsed: aiResponse.usage?.total_tokens || 0,
       responseTime: aiResponse.responseTime,
       modelUsed: 'gpt-3.5-turbo',
-      suggestions: aiResponse.suggestions,
       isUseful: false,
       isPrecise: false,
       isGrateful: false
