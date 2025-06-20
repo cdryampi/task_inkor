@@ -36,6 +36,14 @@
         {
             "source": "/api/supabase/(.*)",
             "destination": "/api/supabase.js"
+        },
+        {
+            "source":"api/motivBotTaskAddTags",
+            "destination": "/api/motivBotTaskAddTags.js"
+        },
+        {
+            "source": "api/motivBotMessageOpenAI",
+            "destination": "/api/motivBotMessageOpenAI.js"
         }
     ],
     "headers": [
