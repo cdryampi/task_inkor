@@ -67,28 +67,28 @@
             <div class="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                 <div class="p-3 bg-white rounded-lg">
                     <div class="flex justify-center mb-2">
-                        <img src="/chibi/happy.png" alt="Happy Chibi" class="w-25 h-25 object-contain" />
+                        <img src="/images/chibi/happy.png" alt="Happy Chibi" class="w-25 h-25 object-contain" />
                     </div>
                     <div class="text-2xl font-bold text-emerald-600">0</div>
                     <div class="text-xs text-gray-500 dark:text-slate-400">Crisis existenciales</div>
                 </div>
                 <div class="p-3 bg-white rounded-lg">
                     <div class="flex justify-center mb-2">
-                        <img src="/chibi/excited.png" alt="Excited Chibi" class="w-25 h-25 object-contain" />
+                        <img src="/images/chibi/excited.png" alt="Excited Chibi" class="w-25 h-25 object-contain" />
                     </div>
                     <div class="text-2xl font-bold text-blue-600">∞</div>
                     <div class="text-xs text-gray-500 dark:text-slate-400">Paciencia del AI</div>
                 </div>
                 <div class="p-3 bg-white rounded-lg">
                     <div class="flex justify-center mb-2">
-                        <img src="/chibi/calm.png" alt="Calm Chibi" class="w-25 h-25 object-contain" />
+                        <img src="/images/chibi/calm.png" alt="Calm Chibi" class="w-25 h-25 object-contain" />
                     </div>
                     <div class="text-2xl font-bold text-purple-600">100%</div>
                     <div class="text-xs text-gray-500 dark:text-slate-400">Libre de juicios</div>
                 </div>
                 <div class="p-3 bg-white rounded-lg">
                     <div class="flex justify-center mb-2">
-                        <img src="/chibi/peaceful.png" alt="Peaceful Chibi" class="w-25 h-25 object-contain" />
+                        <img src="/images/chibi/peaceful.png" alt="Peaceful Chibi" class="w-25 h-25 object-contain" />
                     </div>
                     <div class="text-2xl font-bold text-orange-600">24/7</div>
                     <div class="text-xs text-gray-500 dark:text-slate-400">Disponibilidad</div>

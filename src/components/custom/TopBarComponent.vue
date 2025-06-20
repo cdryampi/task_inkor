@@ -1,18 +1,18 @@
 <template>
   <div class="topbar-wrapper">
     <div class="topbar-container">
-      <!-- Chibi Avatar -->
+      <!-- Chibi Avatar Component -->
       <div class="chibi-section">
-        <div class="chibi-avatar" :class="{ 'animate-pulse': isChangingMessage }">
+        <div class="chibi-container" :class="{ 'animate-pulse': isChangingMessage }">
           <div class="avatar-ring" :class="{ 'active': isChangingMessage }"></div>
-          <img
-            :src="currentImage"
-            alt="Chibi"
-            class="chibi-image"
+          <ChibiAvatar
+            :emotional-state="estado"
+            size="large"
+            :show-emotional-indicator="true"
             :class="{ 'talking': isChangingMessage }"
+            @click="cambiarMensaje"
+            class="cursor-pointer"
           />
-          <!-- Indicador de estado -->
-          <div class="status-dot" :class="estado"></div>
         </div>
       </div>
 
@@ -38,14 +38,13 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useChibiStates } from '@/composables/useChibiStates'
+import ChibiAvatar from '../ui/ChibiAvatar.vue'
 import { useSupabase } from '@/hooks/supabase'
 
-const { currentImage, setChibiState, getImageByState } = useChibiStates()
 const { getRandomMessages } = useSupabase()
 
 const mensaje = ref('')
-const estado = ref('happy')
+const estado = ref('supportive')
 const isChangingMessage = ref(false)
 const mensajesCacheados = ref([])
 
@@ -56,51 +55,59 @@ const mensajeActual = computed(() => {
 // Función para cargar mensajes desde Supabase
 const cargarMensajes = async () => {
   try {
-    console.log('🔄 Cargando mensajes desde Supabase...')
+    console.log('🔄 TopBar - Cargando mensajes desde Supabase...')
     const mensajes = await getRandomMessages(20)
 
     if (mensajes && mensajes.length > 0) {
       mensajesCacheados.value = mensajes
-      console.log('✅ Mensajes cargados:', mensajes.length)
+      console.log('✅ TopBar - Mensajes cargados:', mensajes.length)
     } else {
-      console.warn('⚠️ No se encontraron mensajes, usando fallback')
-      // Mensajes de respaldo si no hay datos en Supabase
+      console.warn('⚠️ TopBar - No se encontraron mensajes, usando fallback')
+      // Mensajes de respaldo mapeados a estados emocionales del ChibiAvatar
       mensajesCacheados.value = [
         { mensaje: '¡Hoy es un gran día para conquistar el mundo! 🌟', estado: 'excited' },
         { mensaje: 'Respira profundo, todo va a estar bien 💙', estado: 'calm' },
-        { mensaje: '¡Eres más fuerte de lo que crees! 💪', estado: 'happy' },
-        { mensaje: 'Paso a paso, sin prisa pero sin pausa 🐢', estado: 'peaceful' }
+        { mensaje: '¡Eres más fuerte de lo que crees! 💪', estado: 'encouraging' },
+        { mensaje: 'Mantén el enfoque, vas genial 🎯', estado: 'focused' },
+        { mensaje: 'Cada pequeño paso cuenta 🚶‍♀️', estado: 'supportive' },
+        { mensaje: '¡Sonríe, todo fluye mejor! 😊', estado: 'happy' },
+        { mensaje: 'La energía positiva es contagiosa ⚡', estado: 'energetic' },
+        { mensaje: 'Reflexiona y encuentra tu camino 🤔', estado: 'thoughtful' }
       ]
     }
   } catch (error) {
-    console.error('❌ Error cargando mensajes:', error)
+    console.error('❌ TopBar - Error cargando mensajes:', error)
     // Usar mensajes de respaldo en caso de error
     mensajesCacheados.value = [
       { mensaje: '¡Hoy es un gran día para conquistar el mundo! 🌟', estado: 'excited' },
       { mensaje: 'Respira profundo, todo va a estar bien 💙', estado: 'calm' },
-      { mensaje: '¡Eres más fuerte de lo que crees! 💪', estado: 'happy' },
-      { mensaje: 'Paso a paso, sin prisa pero sin pausa 🐢', estado: 'peaceful' }
+      { mensaje: '¡Eres más fuerte de lo que crees! 💪', estado: 'encouraging' },
+      { mensaje: 'Mantén el enfoque, vas genial 🎯', estado: 'focused' },
+      { mensaje: 'Cada pequeño paso cuenta 🚶‍♀️', estado: 'supportive' },
+      { mensaje: '¡Sonríe, todo fluye mejor! 😊', estado: 'happy' },
+      { mensaje: 'La energía positiva es contagiosa ⚡', estado: 'energetic' },
+      { mensaje: 'Reflexiona y encuentra tu camino 🤔', estado: 'thoughtful' }
     ]
   }
 }
 
 const cambiarMensaje = async () => {
   if (mensajesCacheados.value.length === 0) {
-    console.warn('⚠️ No hay mensajes cacheados, cargando...')
+    console.warn('⚠️ TopBar - No hay mensajes cacheados, cargando...')
     await cargarMensajes()
   }
 
   isChangingMessage.value = true
 
+  // Simular tiempo de "pensamiento" del avatar
   await new Promise(resolve => setTimeout(resolve, 1500))
 
   if (mensajesCacheados.value.length > 0) {
     const mensajeRandom = mensajesCacheados.value[Math.floor(Math.random() * mensajesCacheados.value.length)]
     mensaje.value = mensajeRandom.mensaje
     estado.value = mensajeRandom.estado
-    setChibiState(mensajeRandom.estado)
 
-    console.log('💬 Mensaje mostrado:', {
+    console.log('💬 TopBar - Mensaje mostrado:', {
       mensaje: mensajeRandom.mensaje,
       estado: mensajeRandom.estado
     })
@@ -113,20 +120,25 @@ const cambiarMensaje = async () => {
 
 // Función para recargar mensajes (se puede usar para refrescar la caché)
 const recargarMensajes = async () => {
-  console.log('🔄 Recargando mensajes...')
+  if (isChangingMessage.value) return
+
+  console.log('🔄 TopBar - Recargando mensajes...')
   await cargarMensajes()
   await cambiarMensaje()
 }
 
 onMounted(async () => {
   await cargarMensajes()
-  await cambiarMensaje()
+  // Mostrar primer mensaje después de un momento
+  setTimeout(() => {
+    cambiarMensaje()
+  }, 1000)
 })
 
-// Cambiar mensaje cada 12 segundos
+// Cambiar mensaje cada 15 segundos
 setInterval(() => {
   cambiarMensaje()
-}, 12000)
+}, 15000)
 
 // Recargar mensajes cada 5 minutos para obtener contenido fresco
 setInterval(() => {
@@ -158,21 +170,25 @@ setInterval(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
   padding: 0 2rem;
   position: relative;
   z-index: 1;
+  gap: 2rem;
 }
 
 .chibi-section {
-  margin-right: 2rem;
+  flex-shrink: 0;
 }
 
-.chibi-avatar {
+.chibi-container {
   position: relative;
   width: 80px;
   height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .avatar-ring {
@@ -191,40 +207,19 @@ setInterval(() => {
   animation: gradientShift 1s ease-in-out infinite, pulse 1s ease-in-out infinite;
 }
 
-.chibi-image {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-  background: white;
-  padding: 8px;
+/* Sobrescribir estilos del ChibiAvatar para el TopBar */
+.chibi-container :deep(.chibi-avatar) {
+  width: 80px !important;
+  height: 80px !important;
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  border: 4px solid white;
   transition: transform 0.3s ease;
-  position: relative;
-  z-index: 2;
 }
 
-.chibi-image.talking {
+.chibi-container.talking :deep(.chibi-avatar) {
   transform: scale(1.05) rotate(2deg);
   animation: talk 0.6s ease-in-out infinite alternate;
 }
-
-.status-dot {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 3px solid white;
-  z-index: 3;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.status-dot.happy { background: #4ecdc4; }
-.status-dot.excited { background: #ff6b6b; }
-.status-dot.calm { background: #45b7d1; }
-.status-dot.peaceful { background: #96ceb4; }
 
 .message-section {
   flex: 1;
@@ -378,10 +373,6 @@ setInterval(() => {
     gap: 1rem;
   }
 
-  .chibi-section {
-    margin-right: 0;
-  }
-
   .bubble-tail {
     left: 50%;
     top: -15px;
@@ -394,6 +385,16 @@ setInterval(() => {
 
   .speech-bubble.typing .bubble-tail {
     border-bottom-color: #f8f9fa;
+  }
+
+  .chibi-container {
+    width: 70px;
+    height: 70px;
+  }
+
+  .chibi-container :deep(.chibi-avatar) {
+    width: 70px !important;
+    height: 70px !important;
   }
 }
 </style>

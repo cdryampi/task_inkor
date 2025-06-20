@@ -1,121 +1,164 @@
 <template>
-  <div class="comment-card" :class="commentTypeClass">
-    <div class="comment-header">
-      <div class="comment-avatar">
-        <component
-          :is="getAvatarIcon()"
-          class="w-6 h-6"
-          :class="getAvatarIconClass()" />
+  <div
+    class="border border-gray-200 rounded-xl p-4 transition-all duration-200 relative"
+    :class="[
+      commentTypeClass,
+      { 'opacity-50 pointer-events-none': deleting }
+    ]"
+  >
+    <!-- Comment Header -->
+    <div class="flex justify-between gap-3 mb-3">
+      <!-- Avatar -->
+      <div class="w-15 h-15 rounded-full flex items-center justify-center flex-shrink-0" :class="avatarBgClass">
+        <ChibiAvatar
+          v-if="comment.type === 'assistant'"
+          :emotional-state="comment.emotional_state || 'supportive'"
+          size="large"
+          :show-emotional-indicator="true"
+        />
+        <UserIconSolid
+          v-else
+          class="w-6 h-6 text-blue-600"
+        />
       </div>
 
-      <div class="comment-meta">
-        <div class="comment-author">
-          <span class="font-medium" :class="getAuthorClass()">
+      <!-- Meta Information -->
+      <div class="flex-1">
+        <div class="flex items-center gap-2 mb-0.5">
+          <span class="font-medium" :class="authorClass">
             {{ comment.author }}
           </span>
           <span v-if="comment.type === 'assistant'" class="ai-badge">
             <SparklesIcon class="w-3 h-3" />
             AI
+            <span v-if="comment.emotional_state" class="ml-1 text-xs">
+              {{ getEmotionalStateLabel(comment.emotional_state) }}
+            </span>
           </span>
         </div>
-        <div class="comment-time">
+        <div class="text-gray-500 text-sm">
           {{ formatRelativeTime(comment.created_at) }}
         </div>
       </div>
 
-      <div class="comment-actions">
+      <!-- Actions -->
+      <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <button
           v-if="comment.type === 'user'"
           @click="askAI"
           :disabled="aiLoading"
-          class="action-btn ai-btn"
-          :class="{ 'loading': aiLoading }"
-          :title="aiLoading ? 'Pidiendo consejo...' : 'Pedir consejo a la AI'">
+          class="action-btn"
+          :class="{ 'opacity-60 cursor-not-allowed': aiLoading }"
+          :title="aiLoading ? 'Pidiendo consejo...' : 'Pedir consejo a la AI'"
+        >
           <div v-if="aiLoading" class="loading-spinner"></div>
           <SparklesIcon v-else class="w-4 h-4" />
         </button>
+
         <button
           @click="copyContent"
-          class="action-btn copy-btn"
-          :title="copied ? 'Copiado!' : 'Copiar contenido'">
-          <component :is="copied ? 'CheckIcon' : 'ClipboardIcon'" class="w-4 h-4" />
+          class="action-btn hover:bg-sky-50 hover:text-sky-600"
+          :title="copied ? 'Copiado!' : 'Copiar contenido'"
+        >
+          <component :is="copied ? CheckIcon : ClipboardIcon" class="w-4 h-4" />
         </button>
-        <!-- Botón eliminar para ambos tipos de comentarios -->
+
         <button
           @click="deleteComment"
-          class="action-btn delete-btn"
-          :title="`Eliminar ${comment.type === 'assistant' ? 'respuesta AI' : 'comentario'}`">
+          class="action-btn hover:bg-red-50 hover:text-red-600"
+          :title="`Eliminar ${comment.type === 'assistant' ? 'respuesta AI' : 'comentario'}`"
+        >
           <TrashIcon class="w-4 h-4" />
         </button>
       </div>
     </div>
 
-    <div class="comment-content">
-      <p class="comment-text">{{ comment.content }}</p>
+    <!-- Comment Content -->
+    <div class="ml-12">
+      <p class="text-gray-700 leading-relaxed mb-3">{{ comment.content }}</p>
 
-      <!-- AI suggestions (if AI comment) -->
-      <div v-if="comment.type === 'assistant' && comment.suggestions" class="ai-suggestions">
-        <h4 class="suggestions-title">
+      <!-- AI Suggestions -->
+      <div
+        v-if="comment.type === 'assistant' && comment.suggestions"
+        class="bg-purple-50 border border-purple-200 rounded-lg p-3 mt-3"
+      >
+        <h4 class="flex items-center gap-1.5 text-purple-700 font-semibold text-sm mb-2">
           <LightBulbIcon class="w-4 h-4" />
           Sugerencias:
         </h4>
-        <ul class="suggestions-list">
-          <li v-for="(suggestion, index) in comment.suggestions" :key="index">
+        <ul class="space-y-1">
+          <li
+            v-for="(suggestion, index) in comment.suggestions"
+            :key="index"
+            class="text-gray-600 text-sm leading-relaxed pl-3 relative"
+          >
+            <span class="absolute left-0 text-purple-600 font-bold">•</span>
             {{ suggestion }}
           </li>
         </ul>
       </div>
     </div>
 
-    <!-- Reaction bar -->
-    <div class="comment-reactions">
+    <!-- Reactions -->
+    <div class="flex gap-2 ml-12 mt-3 pt-3 border-t border-gray-100">
       <button
         @click="toggleReaction('helpful')"
         class="reaction-btn"
-        :class="{ 'active': hasReaction('helpful') }">
+        :class="{ 'bg-blue-100 border-blue-300 text-blue-700': hasReaction('helpful') }"
+      >
         <HandThumbUpIcon class="w-4 h-4" />
         <span>{{ getReactionCount('helpful') || 'Útil' }}</span>
       </button>
+
       <button
         v-if="comment.type === 'assistant'"
         @click="toggleReaction('accurate')"
         class="reaction-btn"
-        :class="{ 'active': hasReaction('accurate') }">
+        :class="{ 'bg-green-100 border-green-300 text-green-700': hasReaction('accurate') }"
+      >
         <CheckBadgeIcon class="w-4 h-4" />
         <span>{{ getReactionCount('accurate') || 'Preciso' }}</span>
       </button>
+
       <button
         @click="toggleReaction('thanks')"
         class="reaction-btn"
-        :class="{ 'active': hasReaction('thanks') }">
+        :class="{ 'bg-pink-100 border-pink-300 text-pink-700': hasReaction('thanks') }"
+      >
         <HeartIcon class="w-4 h-4" />
         <span>{{ getReactionCount('thanks') || 'Gracias' }}</span>
       </button>
     </div>
 
-    <!-- Delete confirmation modal (optional for better UX) -->
-    <div v-if="showDeleteConfirm" class="delete-confirm-overlay" @click="showDeleteConfirm = false">
-      <div class="delete-confirm-modal" @click.stop>
-        <div class="delete-confirm-header">
-          <ExclamationTriangleIcon class="w-6 h-6 text-red-500" />
+    <!-- Delete Confirmation Modal -->
+    <div
+      v-if="showDeleteConfirm"
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      @click="showDeleteConfirm = false"
+    >
+      <div class="bg-white rounded-xl p-6 max-w-sm w-11/12 shadow-2xl" @click.stop>
+        <div class="flex items-center gap-3 mb-4">
+          <ExclamationTriangleIcon class="w-6 h-6 text-red-500 flex-shrink-0" />
           <h3 class="text-lg font-semibold text-gray-900">
             Confirmar eliminación
           </h3>
         </div>
-        <p class="text-gray-600 mb-4">
+        <p class="text-gray-600 mb-6">
           ¿Estás seguro de que quieres eliminar {{ comment.type === 'assistant' ? 'esta respuesta de la AI' : 'este comentario' }}?
           Esta acción no se puede deshacer.
         </p>
-        <div class="flex space-x-3 justify-end">
+        <div class="flex gap-3 justify-end">
           <button
             @click="showDeleteConfirm = false"
-            class="px-4 py-2 text-gray-500 hover:text-gray-700 transition-colors">
+            class="px-4 py-2 text-gray-500 hover:text-gray-700 transition-colors"
+          >
             Cancelar
           </button>
           <button
             @click="confirmDelete"
             :disabled="deleting"
-            class="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 disabled:opacity-50 transition-colors">
+            class="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 disabled:opacity-50 transition-colors"
+          >
             <span v-if="deleting">Eliminando...</span>
             <span v-else>Eliminar</span>
           </button>
@@ -143,6 +186,7 @@ import {
   SparklesIcon as SparklesIconSolid,
   UserIcon as UserIconSolid
 } from '@heroicons/vue/24/solid'
+import ChibiAvatar from '../ui/ChibiAvatar.vue'
 
 // Props
 const props = defineProps({
@@ -167,26 +211,24 @@ const deleting = ref(false)
 
 // Computed
 const commentTypeClass = computed(() => {
-  return props.comment.type === 'assistant' ? 'ai-comment' : 'user-comment'
+  return props.comment.type === 'assistant'
+    ? 'bg-gradient-to-br from-purple-50 to-white border-l-4 border-l-purple-500 group hover:shadow-lg hover:-translate-y-0.5'
+    : 'bg-gradient-to-br from-blue-50 to-white border-l-4 border-l-blue-500 group hover:shadow-lg hover:-translate-y-0.5'
 })
 
-// Methods
-const getAvatarIcon = () => {
-  return props.comment.type === 'assistant' ? SparklesIconSolid : UserIconSolid
-}
-
-const getAvatarIconClass = () => {
+const avatarBgClass = computed(() => {
   return props.comment.type === 'assistant'
-    ? 'text-purple-600'
-    : 'text-blue-600'
-}
+    ? 'bg-gradient-to-br from-purple-100 to-purple-200'
+    : 'bg-gradient-to-br from-blue-100 to-blue-200'
+})
 
-const getAuthorClass = () => {
+const authorClass = computed(() => {
   return props.comment.type === 'assistant'
     ? 'text-purple-800'
     : 'text-blue-800'
-}
+})
 
+// Methods
 const formatRelativeTime = (dateString) => {
   const now = new Date()
   const commentDate = new Date(dateString)
@@ -241,7 +283,6 @@ const toggleReaction = (type) => {
   const hasReacted = hasReaction(type)
   const newValue = !hasReacted
 
-  // Update local state immediately for better UX
   if (!reactions.value[type]) {
     reactions.value[type] = 0
   }
@@ -252,123 +293,49 @@ const toggleReaction = (type) => {
     reactions.value[type] = (reactions.value[type] || 0) + 1
   }
 
-  // Emit to parent for Supabase update
   emit('update-feedback', props.comment.id, type, newValue)
 }
 
 const hasReaction = (type) => {
-  // Check if current user has reacted (simplified - should check user state)
   return (reactions.value[type] || 0) > 0
 }
 
 const getReactionCount = (type) => {
   return reactions.value[type] || 0
 }
+
+const getEmotionalStateLabel = (state) => {
+  const labels = {
+    happy: '😊',
+    excited: '🎉',
+    calm: '😌',
+    focused: '🎯',
+    supportive: '🤗',
+    encouraging: '💪',
+    thoughtful: '🤔',
+    energetic: '⚡'
+  }
+  return labels[state] || '🤖'
+}
 </script>
 
 <style scoped>
-.comment-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.comment-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-}
-
-.user-comment {
-  background: linear-gradient(135deg, #f8fafc, #ffffff);
-  border-left: 4px solid #3b82f6;
-}
-
-.ai-comment {
-  background: linear-gradient(135deg, #faf5ff, #ffffff);
-  border-left: 4px solid #8b5cf6;
-  position: relative;
-  overflow: hidden;
-}
-
-.ai-comment::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 60px;
-  height: 60px;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, transparent 70%);
-  border-radius: 50%;
-  transform: translate(30px, -30px);
-}
-
-.comment-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.comment-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.user-comment .comment-avatar {
-  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
-}
-
-.ai-comment .comment-avatar {
-  background: linear-gradient(135deg, #f3e8ff, #ddd6fe);
-}
-
-.comment-meta {
-  flex: 1;
-}
-
-.comment-author {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 2px;
-}
-
+/* AI Badge con gradiente personalizado */
 .ai-badge {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  gap: 4px;
   color: white;
   font-size: 0.75rem;
   font-weight: 500;
-  padding: 2px 6px;
-  border-radius: 10px;
+  padding: 2px 8px;
+  border-radius: 9999px;
   text-transform: uppercase;
-  letter-spacing: 0.025em;
+  letter-spacing: 0.05em;
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
 }
 
-.comment-time {
-  color: #6b7280;
-  font-size: 0.875rem;
-}
-
-.comment-actions {
-  display: flex;
-  gap: 4px;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.comment-card:hover .comment-actions {
-  opacity: 1;
-}
-
+/* Action buttons */
 .action-btn {
   width: 32px;
   height: 32px;
@@ -378,161 +345,38 @@ const getReactionCount = (type) => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s ease-in-out;
   color: #6b7280;
-  background: transparent;
+  background-color: transparent;
 }
 
 .action-btn:hover {
   transform: scale(1.05);
-}
-
-.ai-btn:hover {
-  background: #f3e8ff;
+  background-color: #f3e8ff;
   color: #8b5cf6;
 }
 
-.copy-btn:hover {
-  background: #f0f9ff;
-  color: #0ea5e9;
-}
-
-.delete-btn:hover {
-  background: #fef2f2;
-  color: #ef4444;
-}
-
-.comment-content {
-  margin-left: 48px;
-}
-
-.comment-text {
-  color: #374151;
-  line-height: 1.6;
-  margin-bottom: 12px;
-}
-
-.ai-suggestions {
-  background: rgba(139, 92, 246, 0.05);
-  border: 1px solid rgba(139, 92, 246, 0.2);
-  border-radius: 8px;
-  padding: 12px;
-  margin-top: 12px;
-}
-
-.suggestions-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #8b5cf6;
-  font-weight: 600;
-  font-size: 0.875rem;
-  margin-bottom: 8px;
-}
-
-.suggestions-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.suggestions-list li {
-  color: #6b7280;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  padding: 4px 0;
-  position: relative;
-  padding-left: 16px;
-}
-
-.suggestions-list li::before {
-  content: '•';
-  color: #8b5cf6;
-  position: absolute;
-  left: 0;
-  font-weight: bold;
-}
-
-.comment-reactions {
-  display: flex;
-  gap: 8px;
-  margin-left: 48px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #f3f4f6;
-}
-
+/* Reaction buttons */
 .reaction-btn {
   display: flex;
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
   border: 1px solid #e5e7eb;
-  border-radius: 16px;
-  background: white;
-  color: #6b7280;
+  border-radius: 9999px;
+  background-color: white;
+  color: #4b5563;
   font-size: 0.75rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s ease-in-out;
 }
 
 .reaction-btn:hover {
   border-color: #d1d5db;
-  background: #f9fafb;
+  background-color: #f9fafb;
 }
 
-.reaction-btn.active {
-  background: #dbeafe;
-  border-color: #3b82f6;
-  color: #1d4ed8;
-}
-
-.delete-confirm-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.delete-confirm-modal {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  max-width: 400px;
-  width: 90%;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-}
-
-.delete-confirm-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.delete-btn:hover {
-  background: #fef2f2;
-  color: #ef4444;
-  transform: scale(1.05);
-}
-
-/* Better visual feedback for delete actions */
-.comment-card.deleting {
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-.ai-btn.loading {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
+/* Loading spinner */
 .loading-spinner {
   width: 16px;
   height: 16px;
@@ -547,20 +391,14 @@ const getReactionCount = (type) => {
   100% { transform: rotate(360deg); }
 }
 
-/* Responsive */
+/* Responsive adjustments */
 @media (max-width: 768px) {
-  .comment-content,
-  .comment-reactions {
-    margin-left: 0;
+  .ml-12 {
+    margin-left: 0 !important;
   }
 
-  .comment-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .comment-actions {
-    opacity: 1;
+  .flex.gap-1.opacity-0 {
+    opacity: 1 !important;
   }
 }
 </style>

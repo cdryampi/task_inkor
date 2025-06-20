@@ -223,7 +223,7 @@ Título: "${taskData.title}"`;
       .update({ tags: generatedTags })
       .eq('id', task_id)
       .select('*')
-      .single();
+      .maybeSingle();
 
     if (updateError) {
       console.error('❌ Error updating task with tags:', updateError);

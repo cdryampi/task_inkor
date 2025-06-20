@@ -32,6 +32,10 @@ CREATE TABLE IF NOT EXISTS public.Conversation (
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE conversation 
+ADD COLUMN emotional_state VARCHAR(50) DEFAULT 'neutral';
+
+
 -- 3. Crear índices para optimizar consultas
 CREATE INDEX IF NOT EXISTS idx_conversation_task_id ON public.Conversation(task_id);
 CREATE INDEX IF NOT EXISTS idx_conversation_created_at ON public.Conversation(created_at);

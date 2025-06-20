@@ -57,7 +57,7 @@ export default async function handler(req, res) {
           .from('task')
           .select('*')
           .eq('id', task_id)
-          .single();
+          .maybeSingle();
 
         if (!fetchError && taskData) {
           // Verificar si ya tiene tags

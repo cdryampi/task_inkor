@@ -1,261 +1,644 @@
 @import "tailwindcss";
-@plugin "flowbite/plugin";
 
 @theme {
-  --color-primary: #10b981; /* verde esmeralda energético */
-  --color-primary-50: #ecfdf5; /* menta fresca */
-  --color-primary-100: #d1fae5; /* verde suave motivador */
-  --color-primary-200: #a7f3d0; /* aliento de productividad */
-  --color-primary-300: #6ee7b7; /* checkbox completado */
-  --color-primary-400: #34d399; /* progreso visible */
-  --color-primary-500: #10b981; /* tono base: éxito en acción */
-  --color-primary-600: #059669; /* determinación verde */
-  --color-primary-700: #047857; /* enfoque profundo */
-  --color-primary-800: #065f46; /* estabilidad productiva */
-  --color-primary-900: #064e3b; /* fundación sólida */
-  --color-primary-950: #022c22; /* raíces de disciplina */
+  /* ==============================================
+     🎨 SISTEMA DE COLORES MOTIVBOT
+     ============================================== */
 
-  /* Colores complementarios alegres */
-  --color-success: #22c55e; /* verde lima celebración */
-  --color-warning: #f59e0b; /* naranja mandarina */
-  --color-error: #ef4444; /* rojo coral suave */
-  --color-info: #3b82f6; /* azul cielo optimista */
+  /* Color principal - Verde esmeralda energético */
+  --color-primary: #10b981;
+  --color-primary-50: #ecfdf5;
+  --color-primary-100: #d1fae5;
+  --color-primary-200: #a7f3d0;
+  --color-primary-300: #6ee7b7;
+  --color-primary-400: #34d399;
+  --color-primary-500: #10b981;
+  --color-primary-600: #059669;
+  --color-primary-700: #047857;
+  --color-primary-800: #065f46;
+  --color-primary-900: #064e3b;
+  --color-primary-950: #022c22;
 
-  /* Tonos secundarios vibrantes */
-  --color-accent: #8b5cf6; /* púrpura creatividad */
-  --color-accent-light: #a78bfa; /* lavanda inspiración */
+  /* Colores funcionales alegres */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
 
-  /* Grises cálidos y amigables */
-  --color-gray-50: #fafafa; /* blanco papel limpio */
-  --color-gray-100: #f5f5f5; /* fondo acogedor */
-  --color-gray-200: #e5e5e5; /* líneas suaves */
-  --color-gray-300: #d4d4d4; /* bordes amigables */
-  --color-gray-400: #a3a3a3; /* texto secundario */
-  --color-gray-500: #737373; /* equilibrio neutral */
-  --color-gray-600: #525252; /* texto principal */
-  --color-gray-700: #404040; /* contraste suave */
-  --color-gray-800: #262626; /* profundidad cálida */
-  --color-gray-900: #171717; /* máximo contraste */
+  /* Colores para estados emocionales de MotivBot */
+  --color-happy: #fbbf24;
+  --color-excited: #f97316;
+  --color-calm: #60a5fa;
+  --color-focused: #8b5cf6;
+  --color-supportive: #10b981;
+  --color-encouraging: #ec4899;
+  --color-thoughtful: #6366f1;
+  --color-energetic: #ef4444;
+
+  /* Tonos secundarios */
+  --color-accent: #8b5cf6;
+  --color-accent-50: #f3e8ff;
+  --color-accent-100: #e9d5ff;
+  --color-accent-200: #ddd6fe;
+  --color-accent-light: #a78bfa;
+
+  /* Grises cálidos */
+  --color-gray-50: #fafafa;
+  --color-gray-100: #f5f5f5;
+  --color-gray-200: #e5e5e5;
+  --color-gray-300: #d4d4d4;
+  --color-gray-400: #a3a3a3;
+  --color-gray-500: #737373;
+  --color-gray-600: #525252;
+  --color-gray-700: #404040;
+  --color-gray-800: #262626;
+  --color-gray-900: #171717;
 }
 
 /* ==============================================
-   🕐 CUSTOM STYLES PARA INPUTS Y COMPONENTES
+   🎯 ESTILOS BASE PARA COMPONENTES
    ============================================== */
 
-/* Input de hora personalizado */
-input[type="time"] {
-  @apply relative;
-
-  /* Asegurar que se muestre el ícono del reloj nativo */
-  -webkit-appearance: none;
-  -moz-appearance: textfield;
-
-  /* Restablecer apariencia pero mantener funcionalidad */
-  background: transparent;
-  background-image: none;
-
-  /* Colores personalizados */
-  color: theme('colors.gray.800');
-
-  /* Focus personalizado */
-  &:focus {
-    box-shadow: 0 0 0 3px theme('colors.primary.100');
-    border-color: theme('colors.primary.500');
-  }
-
-  /* Placeholder más suave */
-  &::placeholder {
-    color: theme('colors.gray.400');
-    opacity: 1;
-  }
+body {
+  background-color: var(--color-gray-50);
+  color: var(--color-gray-800);
+  font-family: system-ui, -apple-system, sans-serif;
+  font-feature-settings: "rlig" 1, "calt" 1;
 }
 
-/* Webkit específico para input time */
-input[type="time"]::-webkit-datetime-edit {
-  color: theme('colors.gray.800');
+/* Contenedor principal de la app */
+.app-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--color-primary-50), white, var(--color-accent-50));
+}
+
+/* ==============================================
+   📝 ESTILOS PARA FORMULARIOS
+   ============================================== */
+
+/* Labels mejorados */
+.form-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-gray-700);
+  margin-bottom: 8px;
+}
+
+.form-label svg {
+  width: 1rem;
+  height: 1rem;
+  color: var(--color-primary-500);
+}
+
+/* Inputs base */
+.form-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--color-gray-300);
+  border-radius: 12px;
+  background-color: white;
+  color: var(--color-gray-800);
+  transition: all 0.2s ease-in-out;
+  font-size: 1rem;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+}
+
+.form-input:hover {
+  border-color: var(--color-gray-400);
+}
+
+.form-input::placeholder {
+  color: var(--color-gray-400);
+}
+
+/* Textareas */
+.form-textarea {
+  min-height: 96px;
+  resize: none;
+}
+
+/* Select personalizado */
+.form-select {
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23525252'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' d='M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px 16px;
+  padding-right: 40px;
+}
+
+/* ==============================================
+   🔘 SISTEMA DE BOTONES
+   ============================================== */
+
+/* Botón base */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+  border: none;
+}
+
+.btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Botón primario */
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600));
+  color: white;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700));
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+/* Botón secundario */
+.btn-secondary {
+  background-color: white;
+  color: var(--color-gray-700);
+  border: 1px solid var(--color-gray-300);
+}
+
+.btn-secondary:hover {
+  background-color: var(--color-gray-50);
+  border-color: var(--color-gray-400);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Botón de acento (AI/MotivBot) */
+.btn-accent {
+  background: linear-gradient(135deg, var(--color-accent), #7c3aed);
+  color: white;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.btn-accent:hover {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+/* Botón de éxito */
+.btn-success {
+  background: linear-gradient(135deg, var(--color-success), #16a34a);
+  color: white;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.btn-success:hover {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+/* Botón de peligro */
+.btn-danger {
+  background: linear-gradient(135deg, var(--color-error), #dc2626);
+  color: white;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.btn-danger:hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+/* Botones pequeños */
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  border-radius: 8px;
+}
+
+/* Botones grandes */
+.btn-lg {
+  padding: 12px 24px;
+  font-size: 1rem;
+  border-radius: 16px;
+}
+
+/* Botón circular */
+.btn-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
   padding: 0;
 }
 
-input[type="time"]::-webkit-datetime-edit-fields-wrapper {
-  background: transparent;
+/* ==============================================
+   🃏 SISTEMA DE TARJETAS
+   ============================================== */
+
+/* Tarjeta base */
+.card {
+  background-color: white;
+  border-radius: 16px;
+  border: 1px solid var(--color-gray-200);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease-in-out;
 }
 
-input[type="time"]::-webkit-datetime-edit-text {
-  color: theme('colors.gray.600');
-  padding: 0 2px;
+.card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
 }
 
-input[type="time"]::-webkit-datetime-edit-hour-field {
-  color: theme('colors.gray.800');
+/* Tarjeta de tarea */
+.task-card {
+  padding: 24px;
 }
 
-input[type="time"]::-webkit-datetime-edit-minute-field {
-  color: theme('colors.gray.800');
+/* Tarjeta de comentario */
+.comment-card {
+  padding: 16px;
 }
 
-input[type="time"]::-webkit-datetime-edit-ampm-field {
-  color: theme('colors.primary.600');
-  font-weight: 500;
+/* Tarjeta de AI */
+.ai-card {
+  border-color: var(--color-accent-200);
+  background: linear-gradient(135deg, var(--color-accent-50), white);
+  position: relative;
+  overflow: hidden;
 }
 
-/* Ícono del reloj nativo de Chrome/Safari */
-input[type="time"]::-webkit-calendar-picker-indicator {
-  background: transparent;
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23525252'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' d='M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z'/%3e%3c/svg%3e");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 16px 16px;
-  width: 20px;
-  height: 20px;
-  border: none;
-  cursor: pointer;
-  margin-left: 4px;
-  opacity: 0.6;
-  transition: opacity 0.2s ease;
-}
-
-input[type="time"]::-webkit-calendar-picker-indicator:hover {
-  opacity: 1;
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%2310b981'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' d='M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z'/%3e%3c/svg%3e");
-}
-
-/* Firefox específico */
-input[type="time"]::-moz-placeholder {
-  color: theme('colors.gray.400');
-  opacity: 1;
-}
-
-/* Input de fecha también personalizado */
-input[type="date"] {
-  @apply relative;
-  color: theme('colors.gray.800');
-
-  &:focus {
-    box-shadow: 0 0 0 3px theme('colors.primary.100');
-    border-color: theme('colors.primary.500');
-  }
-}
-
-/* Ícono del calendario nativo */
-input[type="date"]::-webkit-calendar-picker-indicator {
-  background: transparent;
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23525252'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' d='M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5a2.25 2.25 0 002.25-2.25m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5a2.25 2.25 0 012.25 2.25v7.5m-18 0h18'/%3e%3c/svg%3e");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 16px 16px;
-  width: 20px;
-  height: 20px;
-  border: none;
-  cursor: pointer;
-  margin-left: 4px;
-  opacity: 0.6;
-  transition: opacity 0.2s ease;
-}
-
-input[type="date"]::-webkit-calendar-picker-indicator:hover {
-  opacity: 1;
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%2310b981'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' d='M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5a2.25 2.25 0 002.25-2.25m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5a2.25 2.25 0 012.25 2.25v7.5m-18 0h18'/%3e%3c/svg%3e");
+.ai-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 64px;
+  height: 64px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.2), transparent);
+  border-radius: 50%;
+  transform: translate(8px, -8px);
 }
 
 /* ==============================================
-   🎨 ESTILOS PARA MODAL Y COMPONENTES
+   🏷️ SISTEMA DE BADGES Y ETIQUETAS
    ============================================== */
 
-/* Modal overlay personalizado */
-.modal-overlay {
-  backdrop-filter: blur(4px);
-  background: rgba(0, 0, 0, 0.3);
+/* Badge base */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
 }
 
-/* Botones con estados mejorados */
-.btn-primary {
-  background: linear-gradient(135deg, theme('colors.primary.500'), theme('colors.primary.600'));
-  transition: all 0.2s ease;
-
-  &:hover {
-    background: linear-gradient(135deg, theme('colors.primary.600'), theme('colors.primary.700'));
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px theme('colors.primary.200');
-  }
-
-  &:active {
-    transform: translateY(0);
-  }
+/* Badges de prioridad */
+.badge-priority-high {
+  background-color: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
 }
 
-/* Labels con mejor espaciado */
-.form-label {
-  @apply flex items-center space-x-2 text-sm font-medium text-gray-700 mb-2;
-
-  svg {
-    @apply w-4 h-4 text-gray-600;
-  }
+.badge-priority-medium {
+  background-color: #fffbeb;
+  color: #d97706;
+  border: 1px solid #fed7aa;
 }
 
-/* Inputs con mejor focus */
-.form-input {
-  @apply w-full px-3 py-2 border border-gray-300 rounded-lg outline-none transition-all duration-200;
-
-  &:focus {
-    @apply ring-2 ring-primary-500 border-primary-500;
-    box-shadow: 0 0 0 3px theme('colors.primary.100');
-  }
-
-  &:hover {
-    @apply border-gray-400;
-  }
+.badge-priority-low {
+  background-color: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
 }
 
-/* Preview badges */
-.time-preview {
-  @apply inline-flex items-center space-x-1 text-xs font-medium text-primary-600 bg-primary-50 px-2 py-1 rounded-full border border-primary-200;
-
-  svg {
-    @apply w-3 h-3;
-  }
+/* Badge de AI */
+.badge-ai {
+  background: linear-gradient(135deg, var(--color-accent), #7c3aed);
+  color: white;
 }
 
-/* Animaciones suaves */
+/* Badges de estado emocional */
+.badge-emotion-happy {
+  background-color: #fef3c7;
+  color: #d97706;
+  border: 1px solid #fde68a;
+}
+
+.badge-emotion-excited {
+  background-color: #fed7aa;
+  color: #ea580c;
+  border: 1px solid #fdba74;
+}
+
+.badge-emotion-calm {
+  background-color: #dbeafe;
+  color: #2563eb;
+  border: 1px solid #93c5fd;
+}
+
+.badge-emotion-focused {
+  background-color: #e9d5ff;
+  color: #7c3aed;
+  border: 1px solid #c4b5fd;
+}
+
+.badge-emotion-supportive {
+  background-color: #d1fae5;
+  color: #059669;
+  border: 1px solid #86efac;
+}
+
+.badge-emotion-encouraging {
+  background-color: #fce7f3;
+  color: #be185d;
+  border: 1px solid #fbcfe8;
+}
+
+.badge-emotion-thoughtful {
+  background-color: #e0e7ff;
+  color: #4338ca;
+  border: 1px solid #c7d2fe;
+}
+
+.badge-emotion-energetic {
+  background-color: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+}
+
+/* ==============================================
+   💬 ESTILOS PARA COMPONENTES DE CHAT
+   ============================================== */
+
+/* Avatar Chibi */
+.chibi-avatar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s ease-in-out;
+}
+
+.chibi-avatar:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Indicador emocional del avatar */
+.emotion-indicator {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Burbujas de chat */
+.chat-bubble {
+  max-width: 384px;
+  border-radius: 16px;
+  padding: 12px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.chat-bubble-user {
+  background-color: var(--color-primary-500);
+  color: white;
+  margin-left: auto;
+}
+
+.chat-bubble-ai {
+  background-color: white;
+  border: 1px solid var(--color-gray-200);
+  margin-right: auto;
+}
+
+/* Sugerencias de AI */
+.ai-suggestions {
+  background: linear-gradient(135deg, var(--color-accent-50), #f3e8ff);
+  border: 1px solid var(--color-accent-200);
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.suggestions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: var(--color-gray-700);
+}
+
+.suggestion-item::before {
+  content: '•';
+  color: var(--color-accent);
+  font-weight: bold;
+  margin-top: 2px;
+}
+
+/* ==============================================
+   🎭 ANIMACIONES Y TRANSICIONES
+   ============================================== */
+
+/* Animación de aparición */
 @keyframes fadeInUp {
-  from {
+  0% {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(20px);
   }
-  to {
+  100% {
     opacity: 1;
     transform: translateY(0);
   }
 }
 
 .fade-in-up {
-  animation: fadeInUp 0.3s ease-out;
+  animation: fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Animación de carga */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-gray-200);
+  border-top: 2px solid var(--color-primary-500);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Animación de pulso */
+@keyframes pulse-soft {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.02);
+  }
+}
+
+.pulse-soft {
+  animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Hover glow effect */
+.glow-on-hover {
+  transition: all 0.3s ease-in-out;
+}
+
+.glow-on-hover:hover {
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
 }
 
 /* ==============================================
    📱 RESPONSIVE Y MOBILE FIRST
    ============================================== */
 
+/* Scroll personalizado */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-primary-300) var(--color-gray-100);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background-color: var(--color-gray-100);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--color-primary-300);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-primary-400);
+}
+
+/* Mobile optimizations */
 @media (max-width: 768px) {
-  input[type="time"],
-  input[type="date"] {
-    font-size: 16px; /* Evita zoom en iOS */
+  .form-input {
+    padding: 14px 16px;
+    font-size: 16px;
   }
 
-  .modal-content {
-    @apply mx-4 max-w-none;
+  .btn {
+    min-height: 44px;
+    padding: 0 24px;
+  }
+
+  .card {
+    border-radius: 12px;
+  }
+
+  .task-card {
+    padding: 16px;
+  }
+
+  /* Prevent zoom on input focus (iOS) */
+  input[type="date"],
+  input[type="time"],
+  input[type="text"],
+  input[type="email"],
+  textarea,
+  select {
+    font-size: 16px !important;
   }
 }
 
 /* ==============================================
-   🌙 DARK MODE SUPPORT (futuro)
+   🎨 UTILIDADES PERSONALIZADAS
    ============================================== */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Variables para modo oscuro */
-    --bg-primary: theme('colors.gray.900');
-    --text-primary: theme('colors.gray.100');
-  }
+/* Gradientes de fondo */
+.bg-gradient-motivbot {
+  background: linear-gradient(135deg, var(--color-primary-50), white, var(--color-accent-50));
+}
+
+.bg-gradient-ai {
+  background: linear-gradient(135deg, var(--color-accent-50), #f3e8ff);
+}
+
+/* Sombras personalizadas */
+.shadow-motivbot {
+  box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.1),
+              0 10px 10px -5px rgba(16, 185, 129, 0.04);
+}
+
+.shadow-ai {
+  box-shadow: 0 10px 25px -5px rgba(139, 92, 246, 0.1),
+              0 10px 10px -5px rgba(139, 92, 246, 0.04);
+}
+
+/* Estados de focus mejorados */
+.focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-primary-500);
+}
+
+.focus-ring-accent:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
+
+/* Texto con gradiente */
+.text-gradient-primary {
+  background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-400));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-ai {
+  background: linear-gradient(135deg, var(--color-accent), #a855f7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 

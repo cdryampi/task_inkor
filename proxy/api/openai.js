@@ -41,7 +41,7 @@ export default async function handler(req, res) {
     // Sanitize message (basic security)
     const sanitizedMessage = message.trim().substring(0, 1000);
 
-    // Build system prompt for MotivBot with conversation awareness
+    // Build system prompt for MotivBot with JSON response
     const systemPrompt = `Eres MotivBot 🤖💙, un asistente emocional especializado en gestión de tareas y bienestar.
 
 PERSONALIDAD:
@@ -66,6 +66,26 @@ REGLAS:
 - Si no entiendes algo, pide clarificación
 - No dar consejos médicos profesionales
 - Enfócate en motivación y organización
+
+FORMATO DE RESPUESTA:
+Debes responder SIEMPRE en formato JSON válido con esta estructura:
+{
+  "message": "Tu respuesta motivacional aquí",
+  "emotionalState": "estado_emocional",
+  "suggestions": ["sugerencia1", "sugerencia2", "sugerencia3"]
+}
+
+ESTADOS EMOCIONALES VÁLIDOS:
+- "happy" - Feliz/Motivado
+- "excited" - Emocionado/Entusiasta
+- "calm" - Tranquilo/Relajado
+- "focused" - Concentrado/Productivo
+- "supportive" - Comprensivo/Apoyo
+- "encouraging" - Alentador/Inspirador
+- "thoughtful" - Reflexivo/Pensativo
+- "energetic" - Enérgico/Activo
+
+IMPORTANTE: Tu respuesta debe ser SOLO el JSON, sin texto adicional antes o después.
 
 ${conversationHistory && conversationHistory.length > 0 ?
   `NOTA: Esta conversación tiene historial previo. Mantén coherencia y evita repetir consejos.` :
@@ -123,7 +143,7 @@ ${conversationHistory && conversationHistory.length > 0 ?
             content: userPrompt
           }
         ],
-        max_tokens: 300,
+        max_tokens: 400, // Aumentamos para el JSON
         temperature: 0.7,
         frequency_penalty: 0.3,
         presence_penalty: 0.3
@@ -153,12 +173,41 @@ ${conversationHistory && conversationHistory.length > 0 ?
 
     const aiMessage = data.choices[0].message.content.trim();
 
-    console.log('✅ OpenAI response received successfully');
+    // Parse JSON response from AI
+    let parsedResponse;
+    try {
+      parsedResponse = JSON.parse(aiMessage);
+    } catch (parseError) {
+      console.error('❌ Error parsing AI JSON response:', parseError);
+      console.log('Raw AI response:', aiMessage);
 
-    // Return successful response
+      // Fallback response if JSON parsing fails
+      parsedResponse = {
+        message: aiMessage,
+        emotionalState: 'supportive',
+        suggestions: ['Mantén una actitud positiva', 'Organiza tus tareas por prioridad', 'Toma descansos regulares']
+      };
+    }
+
+    // Validate parsed response structure
+    if (!parsedResponse.message) {
+      parsedResponse.message = 'Lo siento, hubo un problema procesando tu solicitud. ¿Puedes intentarlo de nuevo?';
+    }
+    if (!parsedResponse.emotionalState) {
+      parsedResponse.emotionalState = 'supportive';
+    }
+    if (!Array.isArray(parsedResponse.suggestions)) {
+      parsedResponse.suggestions = [];
+    }
+
+    console.log('✅ OpenAI response parsed successfully:', parsedResponse);
+
+    // Return successful response with structured data
     return res.status(200).json({
       success: true,
-      message: aiMessage,
+      message: parsedResponse.message,
+      emotionalState: parsedResponse.emotionalState,
+      suggestions: parsedResponse.suggestions,
       usage: data.usage || null,
       timestamp: new Date().toISOString()
     });

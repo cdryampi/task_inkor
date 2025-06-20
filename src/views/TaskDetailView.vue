@@ -1,5 +1,5 @@
 <template>
-  <div class="container mx-auto p-4 max-w-6xl">
+  <div class="container mx-auto p-4 max-w-7xl">
     <!-- Loading state -->
     <div v-if="loading" class="text-center py-12">
       <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
@@ -90,9 +90,9 @@
         </div>
       </div>
 
-      <!-- Main Content Grid -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Main Content -->
+      <!-- Main Content Grid - ACTUALIZADO para 3 columnas -->
+      <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <!-- Main Content - 2 columnas -->
         <div class="lg:col-span-2 space-y-6">
           <!-- Description -->
           <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -182,7 +182,7 @@
           </div>
         </div>
 
-        <!-- Sidebar -->
+        <!-- Task Details Sidebar - 1 columna -->
         <div class="space-y-6">
           <!-- Task Details -->
           <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -294,6 +294,11 @@
             </div>
           </div>
         </div>
+
+        <!-- ✅ NUEVO: MotivBot Assistant Sidebar - 1 columna -->
+        <div class="space-y-6">
+          <ChibiMotivBotComponentTask :task="task" />
+        </div>
       </div>
     </div>
 
@@ -356,6 +361,7 @@ import { useConversationsCRUD } from '@/composables/useConversationsCRUD'
 import { useMotivBotAI } from '@/composables/useMotivBotAI'
 import NewTaskModal from '@/components/modals/NewTaskModal.vue'
 import CommentCard from '@/components/comments/CommentCard.vue'
+import ChibiMotivBotComponentTask from '@/components/tasks/ChibiMotivBotComponentTask.vue'
 
 const route = useRoute()
 const router = useRouter()
