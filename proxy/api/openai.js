@@ -71,8 +71,7 @@ FORMATO DE RESPUESTA:
 Debes responder SIEMPRE en formato JSON válido con esta estructura EXACTA:
 {
   "message": "Tu respuesta motivacional aquí",
-  "emotionalState": "estado_emocional",
-  "suggestions": ["sugerencia1", "sugerencia2", "sugerencia3"]
+  "emotionalState": "estado_emocional"
 }
 
 ESTADOS EMOCIONALES VÁLIDOS (usa EXACTAMENTE uno de estos):
@@ -172,11 +171,6 @@ ${conversationHistory && conversationHistory.length > 0 ?
           success: true,
           message: 'Lo siento, tuve un problema técnico pero estoy aquí para ayudarte. ¿Podrías intentar de nuevo?',
           emotionalState: 'supportive',
-          suggestions: [
-            'Intenta reformular tu pregunta',
-            'Revisa tu conexión a internet',
-            'Toma un pequeño descanso y vuelve'
-          ],
           usage: null,
           timestamp: new Date().toISOString(),
           fallback: true
@@ -221,12 +215,7 @@ ${conversationHistory && conversationHistory.length > 0 ?
           // Final fallback response
           parsedResponse = {
             message: extractedMessage.length > 0 ? extractedMessage : 'Lo siento, hubo un problema procesando tu solicitud. ¿Puedes intentarlo de nuevo?',
-            emotionalState: 'supportive',
-            suggestions: [
-              'Mantén una actitud positiva',
-              'Organiza tus tareas por prioridad',
-              'Toma descansos regulares'
-            ]
+            emotionalState: 'supportive'
           };
         }
       }
@@ -243,18 +232,6 @@ ${conversationHistory && conversationHistory.length > 0 ?
         parsedResponse.emotionalState = 'supportive';
       }
 
-      if (!Array.isArray(parsedResponse.suggestions)) {
-        parsedResponse.suggestions = [
-          'Mantén una actitud positiva',
-          'Organiza tus tareas por prioridad',
-          'Toma descansos regulares'
-        ];
-      } else if (parsedResponse.suggestions.length === 0) {
-        parsedResponse.suggestions = ['Sigue adelante, lo estás haciendo bien'];
-      } else if (parsedResponse.suggestions.length > 5) {
-        // Limit to maximum 5 suggestions
-        parsedResponse.suggestions = parsedResponse.suggestions.slice(0, 5);
-      }
 
       console.log('✅ Final validated response:', parsedResponse);
 
@@ -263,7 +240,6 @@ ${conversationHistory && conversationHistory.length > 0 ?
         success: true,
         message: parsedResponse.message,
         emotionalState: parsedResponse.emotionalState,
-        suggestions: parsedResponse.suggestions,
         usage: data.usage || null,
         timestamp: new Date().toISOString()
       });
@@ -277,11 +253,6 @@ ${conversationHistory && conversationHistory.length > 0 ?
           success: true,
           message: 'La consulta está tomando más tiempo del esperado. ¿Podrías intentar con una pregunta más específica?',
           emotionalState: 'calm',
-          suggestions: [
-            'Intenta con una pregunta más corta',
-            'Revisa tu conexión a internet',
-            'Toma un momento y vuelve a intentar'
-          ],
           usage: null,
           timestamp: new Date().toISOString(),
           timeout: true
@@ -299,11 +270,6 @@ ${conversationHistory && conversationHistory.length > 0 ?
       success: true,
       message: 'Disculpa, tuve un problema técnico pero estoy aquí para ayudarte. ¿Podrías intentar de nuevo en un momento?',
       emotionalState: 'supportive',
-      suggestions: [
-        'Intenta de nuevo en unos minutos',
-        'Verifica tu conexión a internet',
-        'Contacta al soporte si el problema persiste'
-      ],
       usage: null,
       timestamp: new Date().toISOString(),
       error: true

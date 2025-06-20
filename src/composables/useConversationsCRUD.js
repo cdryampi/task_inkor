@@ -76,7 +76,6 @@ export const useConversationsCRUD = () => {
       tokens_used: metadata.tokensUsed || 0,
       model_used: metadata.modelUsed || 'gpt-3.5-turbo',
       response_time_ms: metadata.responseTime || 0,
-      suggestions: metadata.suggestions || null // ✅ Sugerencias
     }
 
     console.log('🤖 Creando mensaje del asistente con estado:', metadata.emotionalState)

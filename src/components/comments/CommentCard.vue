@@ -7,13 +7,13 @@
     ]"
   >
     <!-- Comment Header -->
-    <div class="flex justify-between gap-3 mb-3">
+    <div class="flex items-start gap-3 mb-3">
       <!-- Avatar -->
-      <div class="w-15 h-15 rounded-full flex items-center justify-center flex-shrink-0" :class="avatarBgClass">
+      <div class="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0" :class="avatarBgClass">
         <ChibiAvatar
-          v-if="comment.type === 'assistant'"
+          v-if="comment.role === 'assistant'"
           :emotional-state="comment.emotional_state || 'supportive'"
-          size="large"
+          size="medium"
           :show-emotional-indicator="true"
         />
         <UserIconSolid
@@ -26,9 +26,9 @@
       <div class="flex-1">
         <div class="flex items-center gap-2 mb-0.5">
           <span class="font-medium" :class="authorClass">
-            {{ comment.author }}
+            {{ comment.role === 'assistant' ? 'MotivBot' : 'Tú' }}
           </span>
-          <span v-if="comment.type === 'assistant'" class="ai-badge">
+          <span v-if="comment.role === 'assistant'" class="ai-badge">
             <SparklesIcon class="w-3 h-3" />
             AI
             <span v-if="comment.emotional_state" class="ml-1 text-xs">
@@ -44,7 +44,7 @@
       <!-- Actions -->
       <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <button
-          v-if="comment.type === 'user'"
+          v-if="comment.role === 'user'"
           @click="askAI"
           :disabled="aiLoading"
           class="action-btn"
@@ -66,7 +66,7 @@
         <button
           @click="deleteComment"
           class="action-btn hover:bg-red-50 hover:text-red-600"
-          :title="`Eliminar ${comment.type === 'assistant' ? 'respuesta AI' : 'comentario'}`"
+          :title="`Eliminar ${comment.role === 'assistant' ? 'respuesta AI' : 'comentario'}`"
         >
           <TrashIcon class="w-4 h-4" />
         </button>
@@ -74,12 +74,12 @@
     </div>
 
     <!-- Comment Content -->
-    <div class="ml-12">
-      <p class="text-gray-700 leading-relaxed mb-3">{{ comment.content }}</p>
+    <div class="ml-15"> <!-- Ajustado para el nuevo tamaño de avatar -->
+      <p class="text-gray-700 leading-relaxed mb-3">{{ comment.message }}</p>
 
       <!-- AI Suggestions -->
       <div
-        v-if="comment.type === 'assistant' && comment.suggestions"
+        v-if="comment.role === 'assistant' && comment.suggestions && comment.suggestions.length > 0"
         class="bg-purple-50 border border-purple-200 rounded-lg p-3 mt-3"
       >
         <h4 class="flex items-center gap-1.5 text-purple-700 font-semibold text-sm mb-2">
@@ -100,34 +100,46 @@
     </div>
 
     <!-- Reactions -->
-    <div class="flex gap-2 ml-12 mt-3 pt-3 border-t border-gray-100">
+    <div class="flex gap-2 ml-15 mt-3 pt-3 border-t border-gray-100">
       <button
-        @click="toggleReaction('helpful')"
+        @click="toggleReaction('useful')"
         class="reaction-btn"
-        :class="{ 'bg-blue-100 border-blue-300 text-blue-700': hasReaction('helpful') }"
+        :class="{
+          'bg-blue-100 border-blue-300 text-blue-700': comment.role === 'user' ? comment.user_is_useful : comment.assistant_is_useful
+        }"
       >
         <HandThumbUpIcon class="w-4 h-4" />
-        <span>{{ getReactionCount('helpful') || 'Útil' }}</span>
+        <span>Útil</span>
       </button>
 
       <button
-        v-if="comment.type === 'assistant'"
-        @click="toggleReaction('accurate')"
+        v-if="comment.role === 'assistant'"
+        @click="toggleReaction('precise')"
         class="reaction-btn"
-        :class="{ 'bg-green-100 border-green-300 text-green-700': hasReaction('accurate') }"
+        :class="{ 'bg-green-100 border-green-300 text-green-700': comment.assistant_is_precise }"
       >
         <CheckBadgeIcon class="w-4 h-4" />
-        <span>{{ getReactionCount('accurate') || 'Preciso' }}</span>
+        <span>Preciso</span>
       </button>
 
       <button
-        @click="toggleReaction('thanks')"
+        @click="toggleReaction('grateful')"
         class="reaction-btn"
-        :class="{ 'bg-pink-100 border-pink-300 text-pink-700': hasReaction('thanks') }"
+        :class="{
+          'bg-pink-100 border-pink-300 text-pink-700': comment.role === 'user' ? comment.user_is_grateful : comment.assistant_is_grateful
+        }"
       >
         <HeartIcon class="w-4 h-4" />
-        <span>{{ getReactionCount('thanks') || 'Gracias' }}</span>
+        <span>Gracias</span>
       </button>
+
+      <!-- Token Usage (solo para mensajes del asistente) -->
+      <div v-if="comment.role === 'assistant' && comment.tokens_used" class="ml-auto flex items-center text-xs text-gray-400">
+        <span>{{ comment.tokens_used }} tokens</span>
+        <span v-if="comment.response_time_ms" class="ml-2">
+          {{ Math.round(comment.response_time_ms / 1000) }}s
+        </span>
+      </div>
     </div>
 
     <!-- Delete Confirmation Modal -->
@@ -144,7 +156,7 @@
           </h3>
         </div>
         <p class="text-gray-600 mb-6">
-          ¿Estás seguro de que quieres eliminar {{ comment.type === 'assistant' ? 'esta respuesta de la AI' : 'este comentario' }}?
+          ¿Estás seguro de que quieres eliminar {{ comment.role === 'assistant' ? 'esta respuesta de la AI' : 'este comentario' }}?
           Esta acción no se puede deshacer.
         </p>
         <div class="flex gap-3 justify-end">
@@ -192,7 +204,14 @@ import ChibiAvatar from '../ui/ChibiAvatar.vue'
 const props = defineProps({
   comment: {
     type: Object,
-    required: true
+    required: true,
+    validator: (comment) => {
+      // Validar que el comentario tenga la estructura correcta
+      return comment &&
+             typeof comment === 'object' &&
+             ['user', 'assistant'].includes(comment.role) &&
+             typeof comment.message === 'string'
+    }
   },
   aiLoading: {
     type: Boolean,
@@ -205,25 +224,24 @@ const emit = defineEmits(['delete', 'ask-ai', 'update-feedback'])
 
 // State
 const copied = ref(false)
-const reactions = ref(props.comment.reactions || {})
 const showDeleteConfirm = ref(false)
 const deleting = ref(false)
 
 // Computed
 const commentTypeClass = computed(() => {
-  return props.comment.type === 'assistant'
+  return props.comment.role === 'assistant'
     ? 'bg-gradient-to-br from-purple-50 to-white border-l-4 border-l-purple-500 group hover:shadow-lg hover:-translate-y-0.5'
     : 'bg-gradient-to-br from-blue-50 to-white border-l-4 border-l-blue-500 group hover:shadow-lg hover:-translate-y-0.5'
 })
 
 const avatarBgClass = computed(() => {
-  return props.comment.type === 'assistant'
+  return props.comment.role === 'assistant'
     ? 'bg-gradient-to-br from-purple-100 to-purple-200'
     : 'bg-gradient-to-br from-blue-100 to-blue-200'
 })
 
 const authorClass = computed(() => {
-  return props.comment.type === 'assistant'
+  return props.comment.role === 'assistant'
     ? 'text-purple-800'
     : 'text-blue-800'
 })
@@ -248,7 +266,7 @@ const formatRelativeTime = (dateString) => {
 
 const copyContent = async () => {
   try {
-    await navigator.clipboard.writeText(props.comment.content)
+    await navigator.clipboard.writeText(props.comment.message)
     copied.value = true
     setTimeout(() => {
       copied.value = false
@@ -265,7 +283,7 @@ const deleteComment = () => {
 const confirmDelete = async () => {
   deleting.value = true
   try {
-    await emit('delete', props.comment.id)
+    emit('delete', props.comment.id)
     showDeleteConfirm.value = false
   } catch (err) {
     console.error('Error eliminando comentario:', err)
@@ -275,33 +293,41 @@ const confirmDelete = async () => {
 }
 
 const askAI = () => {
-  console.log('💬 CommentCard - Solicitando consejo de AI para:', props.comment.content)
-  emit('ask-ai', props.comment.content)
+  console.log('💬 CommentCard - Solicitando consejo de AI para:', props.comment.message)
+  emit('ask-ai', props.comment.message)
 }
 
+// ✅ Actualizado para trabajar con el nuevo sistema de feedback
 const toggleReaction = (type) => {
-  const hasReacted = hasReaction(type)
-  const newValue = !hasReacted
+  const feedbackData = {}
 
-  if (!reactions.value[type]) {
-    reactions.value[type] = 0
+  switch (type) {
+    case 'useful':
+      if (props.comment.role === 'user') {
+        feedbackData.isUseful = !props.comment.user_is_useful
+      } else {
+        feedbackData.assistantIsUseful = !props.comment.assistant_is_useful
+      }
+      break
+    case 'precise':
+      feedbackData.isPrecise = !props.comment.assistant_is_precise
+      break
+    case 'grateful':
+      if (props.comment.role === 'user') {
+        feedbackData.isGrateful = !props.comment.user_is_grateful
+      } else {
+        feedbackData.assistantIsGrateful = !props.comment.assistant_is_grateful
+      }
+      break
   }
 
-  if (hasReacted) {
-    reactions.value[type] = Math.max(0, reactions.value[type] - 1)
-  } else {
-    reactions.value[type] = (reactions.value[type] || 0) + 1
-  }
+  console.log('👍 CommentCard - Actualizando feedback:', {
+    commentId: props.comment.id,
+    type,
+    feedbackData
+  })
 
-  emit('update-feedback', props.comment.id, type, newValue)
-}
-
-const hasReaction = (type) => {
-  return (reactions.value[type] || 0) > 0
-}
-
-const getReactionCount = (type) => {
-  return reactions.value[type] || 0
+  emit('update-feedback', props.comment.id, feedbackData)
 }
 
 const getEmotionalStateLabel = (state) => {
@@ -391,14 +417,25 @@ const getEmotionalStateLabel = (state) => {
   100% { transform: rotate(360deg); }
 }
 
+/* Ajuste para el nuevo margen */
+.ml-15 {
+  margin-left: 3.75rem; /* 60px */
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  .ml-12 {
+  .ml-15 {
     margin-left: 0 !important;
   }
 
   .flex.gap-1.opacity-0 {
     opacity: 1 !important;
+  }
+
+  /* Avatar más pequeño en móvil */
+  .w-12.h-12 {
+    width: 2.5rem !important;
+    height: 2.5rem !important;
   }
 }
 </style>

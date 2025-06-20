@@ -66,6 +66,22 @@
                     <component :is="getPriorityIcon(task.priority)" class="w-3 h-3 mr-1" />
                     {{ getPriorityLabel(task.priority) }}
                   </span>
+                  <!-- Tags -->
+                  <div v-if="task.tags && task.tags.length > 0" class="flex items-center space-x-1">
+                    <span
+                      v-for="tag in task.tags.slice(0, 3)"
+                      :key="tag"
+                      class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-700"
+                    >
+                      #{{ tag }}
+                    </span>
+                    <span
+                      v-if="task.tags.length > 3"
+                      class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-500"
+                    >
+                      +{{ task.tags.length - 3 }}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -119,6 +135,11 @@
                 <span class="bg-gray-100 text-gray-500 px-2 py-1 rounded-full text-xs">
                   {{ conversations.length }}
                 </span>
+                <!-- ✅ Mostrar último estado emocional -->
+                <div v-if="lastEmotionalState" class="flex items-center space-x-1">
+                  <span class="text-xs text-gray-400">MotivBot:</span>
+                  <span class="text-sm">{{ getEmotionalStateEmoji(lastEmotionalState) }}</span>
+                </div>
               </div>
               <button
                 @click="showAddComment = !showAddComment"
@@ -139,24 +160,37 @@
               <form @submit.prevent="addComment" class="space-y-3">
                 <textarea
                   v-model="newComment"
-                  placeholder="Escribe un comentario..."
+                  placeholder="Escribe un comentario o pregunta algo a MotivBot..."
                   rows="3"
                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 resize-none text-sm"
                   required></textarea>
-                <div class="flex justify-end space-x-2">
-                  <button
-                    type="button"
-                    @click="showAddComment = false"
-                    class="px-3 py-1 text-gray-500 hover:text-gray-700 text-sm transition-colors">
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    :disabled="!newComment.trim() || addingComment"
-                    class="px-3 py-1 bg-primary-500 text-white rounded-md hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm">
-                    <span v-if="addingComment">Agregando...</span>
-                    <span v-else>Comentar</span>
-                  </button>
+                <div class="flex justify-between items-center">
+                  <div class="flex items-center space-x-2">
+                    <input
+                      id="askAiDirectly"
+                      v-model="askAiDirectly"
+                      type="checkbox"
+                      class="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500"
+                    />
+                    <label for="askAiDirectly" class="text-xs text-gray-600">
+                      🤖 Pedir respuesta automática de MotivBot
+                    </label>
+                  </div>
+                  <div class="flex space-x-2">
+                    <button
+                      type="button"
+                      @click="showAddComment = false"
+                      class="px-3 py-1 text-gray-500 hover:text-gray-700 text-sm transition-colors">
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      :disabled="!newComment.trim() || addingComment"
+                      class="px-3 py-1 bg-primary-500 text-white rounded-md hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm">
+                      <span v-if="addingComment">{{ askAiDirectly ? 'Enviando y pidiendo consejo...' : 'Agregando...' }}</span>
+                      <span v-else>{{ askAiDirectly ? 'Enviar y pedir consejo' : 'Comentar' }}</span>
+                    </button>
+                  </div>
                 </div>
               </form>
             </div>
@@ -164,7 +198,7 @@
             <!-- Comments List -->
             <div class="space-y-4">
               <CommentCard
-                v-for="comment in formattedConversations"
+                v-for="comment in conversations"
                 :key="comment.id"
                 :comment="comment"
                 :aiLoading="aiLoading"
@@ -176,7 +210,7 @@
               <div v-if="conversations.length === 0 && !conversationsLoading" class="text-center py-8">
                 <ChatBubbleLeftRightIcon class="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p class="text-gray-500 text-sm">No hay conversaciones aún</p>
-                <p class="text-gray-400 text-xs">¡Sé el primero en comentar!</p>
+                <p class="text-gray-400 text-xs">¡Sé el primero en comentar o preguntarle a MotivBot!</p>
               </div>
             </div>
           </div>
@@ -242,6 +276,20 @@
                   {{ formatDate(task.updated_at) }}
                 </span>
               </div>
+
+              <!-- Tags section -->
+              <div v-if="task.tags && task.tags.length > 0" class="pt-4 border-t border-gray-100">
+                <span class="text-sm text-gray-500 mb-2 block">Tags:</span>
+                <div class="flex flex-wrap gap-1">
+                  <span
+                    v-for="tag in task.tags"
+                    :key="tag"
+                    class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-700"
+                  >
+                    #{{ tag }}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -284,6 +332,22 @@
                 </div>
               </div>
 
+              <!-- ✅ Estadísticas emocionales -->
+              <div v-if="conversationStats.emotionalStateDistribution && Object.keys(conversationStats.emotionalStateDistribution).length > 0" class="pt-2 border-t border-gray-100">
+                <div class="text-xs text-gray-500 mb-2">Estados emocionales de MotivBot:</div>
+                <div class="grid grid-cols-4 gap-1">
+                  <div
+                    v-for="(count, state) in conversationStats.emotionalStateDistribution"
+                    :key="state"
+                    class="text-center"
+                    :title="`${state}: ${count} veces`"
+                  >
+                    <div class="text-lg">{{ getEmotionalStateEmoji(state) }}</div>
+                    <div class="text-xs text-gray-400">{{ count }}</div>
+                  </div>
+                </div>
+              </div>
+
               <!-- Conversation Stats -->
               <div class="pt-2 border-t border-gray-100">
                 <div class="grid grid-cols-2 gap-2 text-xs text-gray-500">
@@ -295,9 +359,14 @@
           </div>
         </div>
 
-        <!-- ✅ NUEVO: MotivBot Assistant Sidebar - 1 columna -->
+        <!-- ✅ MotivBot Assistant Sidebar - 1 columna -->
         <div class="space-y-6">
-          <ChibiMotivBotComponentTask :task="task" />
+          <ChibiMotivBotComponentTask
+            :task="task"
+            :conversation-history="conversations"
+            :last-emotional-state="lastEmotionalState"
+            @conversation-added="loadConversations"
+          />
         </div>
       </div>
     </div>
@@ -365,7 +434,7 @@ import ChibiMotivBotComponentTask from '@/components/tasks/ChibiMotivBotComponen
 
 const route = useRoute()
 const router = useRouter()
-const { getTaskById, updateTask, deleteTask, toggleTaskStatus } = useSupabase()
+const { getTaskById, updateTask, deleteTask } = useSupabase()
 
 // Conversations composable
 const {
@@ -375,12 +444,14 @@ const {
   conversationStats,
   getConversations,
   createConversation,
-  updateConversationFeedback: updateFeedback,
+  createAssistantMessage,
+  createUserMessage,
+  updateConversation,
   deleteConversation,
-  addGPTConversation
+  getLastEmotionalState
 } = useConversationsCRUD()
 
-// ✅ AGREGAR EL COMPOSABLE DE MOTIVBOT
+// ✅ MOTIVBOT AI composable
 const { askMotivBotWithContext, isLoading: aiLoading } = useMotivBotAI()
 
 // Estado completamente local
@@ -394,29 +465,27 @@ const updatingTask = ref(false)
 const newComment = ref('')
 const showAddComment = ref(false)
 const addingComment = ref(false)
+const askAiDirectly = ref(false) // ✅ Nueva opción para pedir respuesta automática
 
-// ✅ DECLARAR VARIABLES FALTANTES
-const taskProgress = ref(0)
-const taskStats = ref({
-  totalComments: 0,
-  userComments: 0,
-  aiComments: 0
+// ✅ Computed para último estado emocional
+const lastEmotionalState = computed(() => {
+  return getLastEmotionalState()
 })
 
-// update task progress
+// ✅ Método para eliminar tarea
+const deleteTaskHandler = async () => {
+  if (!confirm('¿Estás seguro de que quieres eliminar esta tarea? Esta acción no se puede deshacer.')) {
+    return
+  }
 
-
-// Format conversations for CommentCard component
-const formattedConversations = computed(() => {
-  return conversations.value.map(conv => ({
-    id: conv.id,
-    type: conv.role,
-    content: conv.message,
-    created_at: conv.created_at,
-    author: conv.role === 'user' ? 'Usuario' : 'MotivBot',
-    _originalData: conv
-  }))
-})
+  try {
+    await deleteTask(task.value.id)
+    router.push('/mis-tareas')
+  } catch (err) {
+    console.error('❌ Error eliminando tarea:', err)
+    error.value = 'Error al eliminar la tarea'
+  }
+}
 
 // Métodos locales para el modal
 const openEditModal = () => {
@@ -439,7 +508,6 @@ const formatTaskForModal = (taskData) => {
     priority: taskData.priority || 'normal',
     dueDate: taskData.due_date,
     dueTime: taskData.due_time,
-    // ✅ ASEGURAR QUE INCLUYE EL task_id
     task_id: taskData.id
   }
 }
@@ -459,7 +527,7 @@ const handleUpdateTask = async (taskData) => {
   }
 }
 
-// ✅ DECLARAR MÉTODOS FALTANTES
+// ✅ Métodos principales
 const loadTask = async () => {
   try {
     console.log('🔄 TaskDetailView - Cargando tarea:', route.params.id)
@@ -473,12 +541,9 @@ const loadTask = async () => {
   }
 }
 
-// ✅ ARREGLAR loadConversations para usar el task_id correcto
 const loadConversations = async () => {
   try {
     console.log('🔄 TaskDetailView - Cargando conversaciones para tarea:', route.params.id)
-
-    // ✅ ASEGURAR QUE PASAMOS EL task_id CORRECTO
     const taskId = parseInt(route.params.id)
 
     if (!taskId) {
@@ -489,19 +554,12 @@ const loadConversations = async () => {
     await getConversations(taskId)
     console.log('✅ TaskDetailView - Conversaciones cargadas:', conversations.value.length)
 
-    // ✅ DEBUG: Verificar que las conversaciones son de la tarea correcta
-    conversations.value.forEach(conv => {
-      if (conv.task_id !== taskId) {
-        console.warn('⚠️ Conversación con task_id incorrecto:', conv.task_id, 'esperado:', taskId)
-      }
-    })
-
   } catch (err) {
     console.error('❌ TaskDetailView - Error cargando conversaciones:', err)
   }
 }
 
-// Methods
+// ✅ MEJORADO: addComment con opción de IA automática
 const addComment = async () => {
   if (!newComment.value.trim()) return
 
@@ -512,19 +570,49 @@ const addComment = async () => {
 
     console.log('💬 TaskDetailView - Agregando comentario para tarea:', taskId)
 
-    // ✅ ASEGURAR QUE EL task_id ES CORRECTO
-    await createConversation({
-      task_id: taskId,
-      role: 'user',
-      message: newComment.value.trim(),
-      user_is_grateful: false,
-      user_is_useful: false
-    })
+    // Crear mensaje del usuario
+    await createUserMessage(taskId, newComment.value.trim())
+
+    // Si el usuario quiere respuesta automática de IA
+    if (askAiDirectly.value) {
+      console.log('🤖 TaskDetailView - Solicitando respuesta automática de MotivBot...')
+
+      // Recargar conversaciones para incluir el nuevo comentario en el contexto
+      await loadConversations()
+
+      // Obtener respuesta de MotivBot
+      const aiResponse = await askMotivBotWithContext(
+        taskId,
+        newComment.value.trim(),
+        {
+          title: task.value?.title,
+          description: task.value?.description,
+          status: task.value?.status,
+          priority: task.value?.priority,
+          due_date: task.value?.due_date,
+          tags: task.value?.tags
+        },
+        conversations.value
+      )
+
+      // Guardar respuesta del asistente
+      await createAssistantMessage(taskId, aiResponse.message, {
+        emotionalState: aiResponse.emotionalState,
+        tokensUsed: aiResponse.usage?.total_tokens || 0,
+        responseTime: aiResponse.responseTime,
+        modelUsed: 'gpt-3.5-turbo',
+        suggestions: aiResponse.suggestions,
+        isUseful: false,
+        isPrecise: false,
+        isGrateful: false
+      })
+    }
 
     newComment.value = ''
     showAddComment.value = false
+    askAiDirectly.value = false
 
-    // ✅ RELOAD CONVERSATIONS PARA LA TAREA ESPECÍFICA
+    // Recargar conversaciones
     await loadConversations()
 
     console.log('✅ TaskDetailView - Comentario agregado exitosamente')
@@ -537,7 +625,7 @@ const addComment = async () => {
   }
 }
 
-// ✅ MEJORAR askAI para incluir historial de conversaciones
+// ✅ MEJORADO: askAI con historial completo
 const askAI = async (commentContent) => {
   try {
     console.log('🤖 TaskDetailView - Pidiendo consejo a MotivBot...', commentContent)
@@ -550,7 +638,8 @@ const askAI = async (commentContent) => {
       description: task.value?.description,
       status: task.value?.status,
       priority: task.value?.priority,
-      due_date: task.value?.due_date
+      due_date: task.value?.due_date,
+      tags: task.value?.tags
     }
 
     // Preparar historial de conversaciones (ordenado cronológicamente)
@@ -569,24 +658,22 @@ const askAI = async (commentContent) => {
       taskId,
       `Dame un consejo sobre este comentario: "${commentContent}"`,
       taskContextData,
-      sortedHistory // ✅ PASAR EL HISTORIAL
+      sortedHistory
     )
 
     console.log('🤖 Respuesta de MotivBot:', aiResponse.message)
 
     // Guardar la respuesta como conversación de asistente
-    await addGPTConversation(
-      taskId,
-      'assistant',
-      aiResponse.message,
-      {
-        source: 'task_detail_ai_button',
-        modelUsed: 'gpt-3.5-turbo',
-        tokensUsed: aiResponse.usage?.total_tokens || 0,
-        responseTime: aiResponse.responseTime,
-        historyIncluded: sortedHistory.length
-      }
-    )
+    await createAssistantMessage(taskId, aiResponse.message, {
+      emotionalState: aiResponse.emotionalState,
+      tokensUsed: aiResponse.usage?.total_tokens || 0,
+      responseTime: aiResponse.responseTime,
+      modelUsed: 'gpt-3.5-turbo',
+      suggestions: aiResponse.suggestions,
+      isUseful: false,
+      isPrecise: false,
+      isGrateful: false
+    })
 
     // Recargar conversaciones
     await loadConversations()
@@ -598,14 +685,11 @@ const askAI = async (commentContent) => {
     error.value = 'Error al obtener consejo de la AI'
   }
 }
+
 const deleteComment = async (commentId) => {
   try {
-    // Use the deleteConversation method from composable
     await deleteConversation(commentId)
-
-    // Reload conversations to get fresh data
     await loadConversations()
-
     console.log('✅ Comentario eliminado exitosamente')
   } catch (err) {
     console.error('❌ Error eliminando comentario:', err)
@@ -613,29 +697,37 @@ const deleteComment = async (commentId) => {
   }
 }
 
-const updateConversationFeedback = async (commentId, feedbackType, value) => {
+// ✅ CORREGIDO: updateConversationFeedback
+const updateConversationFeedback = async (conversationId, feedbackData) => {
   try {
-    const feedback = {}
+    console.log('👍 TaskDetailView - Actualizando feedback:', {
+      conversationId,
+      feedbackData
+    })
 
-    // Map feedback types to database fields
-    switch (feedbackType) {
-      case 'helpful':
-        feedback.userIsUseful = value
-        break
-      case 'accurate':
-        feedback.assistantIsPrecise = value
-        break
-      case 'thanks':
-        feedback.userIsGrateful = value
-        break
-    }
-
-    await updateFeedback(commentId, feedback)
+    await updateConversation(conversationId, feedbackData)
     await loadConversations()
 
+    console.log('✅ Feedback actualizado exitosamente')
   } catch (err) {
-    console.error('Error actualizando feedback:', err)
+    console.error('❌ Error actualizando feedback:', err)
+    error.value = 'Error al actualizar feedback'
   }
+}
+
+// ✅ Función para obtener emoji del estado emocional
+const getEmotionalStateEmoji = (state) => {
+  const emojis = {
+    happy: '😊',
+    excited: '🎉',
+    calm: '😌',
+    focused: '🎯',
+    supportive: '🤗',
+    encouraging: '💪',
+    thoughtful: '🤔',
+    energetic: '⚡'
+  }
+  return emojis[state] || '🤖'
 }
 
 // Task Icon functions
@@ -781,17 +873,12 @@ const callUpdateTaskStatus = async () => {
   if (!task.value) return
   try {
     console.log('🔄 TaskDetailView - Actualizando estado de tarea:', task.value.status)
-
-    // ✅ CORREGIR: Usar updateTask en lugar de toggleTaskStatus
     await updateTask(task.value.id, { status: task.value.status })
-
-    await loadTask() // Reload task data after status change
+    await loadTask()
     console.log('✅ TaskDetailView - Estado de tarea actualizado exitosamente')
   } catch (err) {
     console.error('❌ TaskDetailView - Error actualizando estado de tarea:', err)
     error.value = 'Error al actualizar el estado de la tarea'
-
-    // ✅ OPCIONAL: Revertir el cambio en caso de error
     await loadTask()
   }
 }

@@ -81,7 +81,6 @@ export const useConversations = () => {
         model_used: metadata.modelUsed || 'gpt-3.5-turbo',
         response_time_ms: metadata.responseTime || 0,
         emotional_state: metadata.emotionalState || 'supportive', // ✅ Corregido y con valor por defecto
-        suggestions: metadata.suggestions || null // ✅ Añadido soporte para sugerencias
       }
 
       console.log('💾 Guardando mensaje del asistente:', {
