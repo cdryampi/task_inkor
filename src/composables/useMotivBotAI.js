@@ -64,9 +64,11 @@ export const useMotivBotAI = () => {
       }
 
       console.log('✅ Respuesta de MotivBot recibida')
+      console.log('🎭 Estado emocional recibido:', data.emotionalState) // ✅ Log para verificar
 
       return {
         message: data.message,
+        emotionalState: data.emotionalState, // ✅ ¡AGREGAR ESTA LÍNEA!
         usage: data.usage,
         timestamp: data.timestamp,
         responseTime: Date.now() - startTime

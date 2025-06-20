@@ -99,38 +99,46 @@
       </div>
     </div>
 
-    <!-- Reactions -->
+    <!-- Reactions con mejor estado visual -->
     <div class="flex gap-2 ml-15 mt-3 pt-3 border-t border-gray-100">
       <button
         @click="toggleReaction('useful')"
         class="reaction-btn"
         :class="{
-          'bg-blue-100 border-blue-300 text-blue-700': comment.role === 'user' ? comment.user_is_useful : comment.assistant_is_useful
+          'reaction-btn-active bg-blue-100 border-blue-300 text-blue-700 shadow-sm': comment.role === 'user' ? comment.user_is_useful : comment.assistant_is_useful,
+          'reaction-btn-inactive hover:bg-blue-50 hover:border-blue-200': !(comment.role === 'user' ? comment.user_is_useful : comment.assistant_is_useful)
         }"
       >
         <HandThumbUpIcon class="w-4 h-4" />
         <span>Útil</span>
+        <span v-if="comment.role === 'user' ? comment.user_is_useful : comment.assistant_is_useful" class="reaction-checkmark">✓</span>
       </button>
 
       <button
         v-if="comment.role === 'assistant'"
         @click="toggleReaction('precise')"
         class="reaction-btn"
-        :class="{ 'bg-green-100 border-green-300 text-green-700': comment.assistant_is_precise }"
+        :class="{
+          'reaction-btn-active bg-green-100 border-green-300 text-green-700 shadow-sm': comment.assistant_is_precise,
+          'reaction-btn-inactive hover:bg-green-50 hover:border-green-200': !comment.assistant_is_precise
+        }"
       >
         <CheckBadgeIcon class="w-4 h-4" />
         <span>Preciso</span>
+        <span v-if="comment.assistant_is_precise" class="reaction-checkmark">✓</span>
       </button>
 
       <button
         @click="toggleReaction('grateful')"
         class="reaction-btn"
         :class="{
-          'bg-pink-100 border-pink-300 text-pink-700': comment.role === 'user' ? comment.user_is_grateful : comment.assistant_is_grateful
+          'reaction-btn-active bg-pink-100 border-pink-300 text-pink-700 shadow-sm': comment.role === 'user' ? comment.user_is_grateful : comment.assistant_is_grateful,
+          'reaction-btn-inactive hover:bg-pink-50 hover:border-pink-200': !(comment.role === 'user' ? comment.user_is_grateful : comment.assistant_is_grateful)
         }"
       >
         <HeartIcon class="w-4 h-4" />
         <span>Gracias</span>
+        <span v-if="comment.role === 'user' ? comment.user_is_grateful : comment.assistant_is_grateful" class="reaction-checkmark">✓</span>
       </button>
 
       <!-- Token Usage (solo para mensajes del asistente) -->
@@ -297,26 +305,26 @@ const askAI = () => {
   emit('ask-ai', props.comment.message)
 }
 
-// ✅ Actualizado para trabajar con el nuevo sistema de feedback
+// ✅ Corrección del bug en la función toggleReaction
 const toggleReaction = (type) => {
   const feedbackData = {}
 
   switch (type) {
     case 'useful':
       if (props.comment.role === 'user') {
-        feedbackData.isUseful = !props.comment.user_is_useful
+        feedbackData.user_is_useful = !props.comment.user_is_useful
       } else {
-        feedbackData.assistantIsUseful = !props.comment.assistant_is_useful
+        feedbackData.assistant_is_useful = !props.comment.assistant_is_useful
       }
       break
     case 'precise':
-      feedbackData.isPrecise = !props.comment.assistant_is_precise
+      feedbackData.assistant_is_precise = !props.comment.assistant_is_precise
       break
     case 'grateful':
       if (props.comment.role === 'user') {
-        feedbackData.isGrateful = !props.comment.user_is_grateful
+        feedbackData.user_is_grateful = !props.comment.user_is_grateful // ✅ CORREGIDO
       } else {
-        feedbackData.assistantIsGrateful = !props.comment.assistant_is_grateful
+        feedbackData.assistant_is_grateful = !props.comment.assistant_is_grateful // ✅ CORREGIDO
       }
       break
   }
@@ -382,24 +390,100 @@ const getEmotionalStateLabel = (state) => {
   color: #8b5cf6;
 }
 
-/* Reaction buttons */
+/* ✅ REACTION BUTTONS MEJORADOS */
 .reaction-btn {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border: 1px solid #e5e7eb;
-  border-radius: 9999px;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 20px;
   background-color: white;
   color: #4b5563;
   font-size: 0.75rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease-in-out;
+  transition: all 0.3s ease-in-out;
+  position: relative;
+  min-width: 80px;
+  justify-content: center;
 }
 
-.reaction-btn:hover {
+/* Estado inactivo */
+.reaction-btn-inactive {
+  border-color: #e5e7eb;
+  background-color: white;
+  color: #6b7280;
+}
+
+.reaction-btn-inactive:hover {
   border-color: #d1d5db;
   background-color: #f9fafb;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* ✅ Estado activo/presionado */
+.reaction-btn-active {
+  font-weight: 600;
+  transform: translateY(0px);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-width: 2px;
+}
+
+/* Efecto de pulso cuando está activo */
+.reaction-btn-active:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15), inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* ✅ Checkmark para estados activos */
+.reaction-checkmark {
+  font-size: 0.7rem;
+  font-weight: bold;
+  margin-left: 2px;
+  animation: checkmark-appear 0.3s ease-out;
+}
+
+@keyframes checkmark-appear {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ✅ Colores específicos para cada estado activo */
+.bg-blue-100.reaction-btn-active {
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  border-color: #3b82f6;
+  color: #1d4ed8;
+}
+
+.bg-green-100.reaction-btn-active {
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  border-color: #10b981;
+  color: #065f46;
+}
+
+.bg-pink-100.reaction-btn-active {
+  background: linear-gradient(135deg, #fce7f3, #fbcfe8);
+  border-color: #ec4899;
+  color: #be185d;
+}
+
+/* ✅ Animación de click */
+@keyframes reaction-click {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+.reaction-btn:active {
+  animation: reaction-click 0.2s ease-in-out;
 }
 
 /* Loading spinner */
@@ -422,7 +506,7 @@ const getEmotionalStateLabel = (state) => {
   margin-left: 3.75rem; /* 60px */
 }
 
-/* Responsive adjustments */
+/* ✅ RESPONSIVE MEJORADO */
 @media (max-width: 768px) {
   .ml-15 {
     margin-left: 0 !important;
@@ -437,5 +521,26 @@ const getEmotionalStateLabel = (state) => {
     width: 2.5rem !important;
     height: 2.5rem !important;
   }
+
+  /* Botones de reacción más compactos en móvil */
+  .reaction-btn {
+    padding: 4px 8px;
+    font-size: 0.7rem;
+    min-width: 70px;
+  }
+
+  .reaction-btn span:not(.reaction-checkmark) {
+    display: none; /* Ocultar texto en móvil, solo iconos */
+  }
+}
+
+/* ✅ Efecto hover sutil cuando no está activo */
+.reaction-btn-inactive:hover svg {
+  transform: scale(1.1);
+}
+
+/* ✅ Efecto para iconos cuando está activo */
+.reaction-btn-active svg {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
 }
 </style>

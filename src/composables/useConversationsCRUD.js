@@ -79,6 +79,7 @@ export const useConversationsCRUD = () => {
     }
 
     console.log('🤖 Creando mensaje del asistente con estado:', metadata.emotionalState)
+    console.log('📊 Datos completos que se van a guardar:', conversationData) // ✅ Añadir este log
 
     return await createConversation(conversationData)
   }
@@ -91,7 +92,8 @@ export const useConversationsCRUD = () => {
       message: message.trim(),
       emotional_state: feedback.emotionalState || null, // ✅ Usuario también puede tener estado
       user_is_grateful: feedback.isGrateful || false,
-      user_is_useful: feedback.isUseful || false
+      user_is_useful: feedback.isUseful || false,
+      assistant_is_useful: feedback.isUseful || false // ✅ Añadir este campo
     }
 
     return await createConversation(conversationData)
@@ -194,14 +196,23 @@ export const useConversationsCRUD = () => {
         }
       }
 
+      console.log('🔄 useConversationsCRUD - Actualizando conversación:', {
+        id,
+        updates,
+        columnNames: Object.keys(updates) // ✅ Ver qué columnas intentamos actualizar
+      })
+
       const { data, error: supabaseError } = await supabase
         .from('conversation')
         .update(updates)
         .eq('id', id)
         .select()
-        .maybeSingle() // ✅ Cambiado a maybeSingle
+        .maybeSingle()
 
-      if (supabaseError) throw supabaseError
+      if (supabaseError) {
+        console.error('❌ useConversationsCRUD - Error Supabase al actualizar:', supabaseError)
+        throw supabaseError
+      }
 
       // Actualizar en la lista local
       if (data) {
@@ -212,6 +223,7 @@ export const useConversationsCRUD = () => {
         }
       }
 
+      console.log('✅ useConversationsCRUD - Conversación actualizada exitosamente:', data)
       return data
 
     } catch (err) {

@@ -568,8 +568,6 @@ const addComment = async () => {
   try {
     const taskId = parseInt(route.params.id)
 
-    console.log('💬 TaskDetailView - Agregando comentario para tarea:', taskId)
-
     // Crear mensaje del usuario
     await createUserMessage(taskId, newComment.value.trim())
 
@@ -595,15 +593,18 @@ const addComment = async () => {
         conversations.value
       )
 
-      // Guardar respuesta del asistente
+      console.log('🔍 DEBUG - Respuesta completa del AI:', aiResponse) // ✅ Añadir este log
+
+      // ✅ CORRECCIÓN: Usar los campos correctos del aiResponse
       await createAssistantMessage(taskId, aiResponse.message, {
-        emotionalState: aiResponse.emotionalState,
+        emotionalState: aiResponse.emotionalState, // ✅ Campo correcto
         tokensUsed: aiResponse.usage?.total_tokens || 0,
-        responseTime: aiResponse.responseTime,
+        responseTime: aiResponse.responseTime || 0,
         modelUsed: 'gpt-3.5-turbo',
         isUseful: false,
         isPrecise: false,
         isGrateful: false
+        // suggestions: aiResponse.suggestions, // ❌ Remover esta línea
       })
     }
 
