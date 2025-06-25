@@ -135,10 +135,15 @@
                 <span class="bg-gray-100 text-gray-500 px-2 py-1 rounded-full text-xs">
                   {{ conversations.length }}
                 </span>
-                <!-- ✅ Mostrar último estado emocional -->
+                <!-- ✅ CAMBIO: Usar icono en lugar de emoji -->
                 <div v-if="lastEmotionalState" class="flex items-center space-x-1">
                   <span class="text-xs text-gray-400">MotivBot:</span>
-                  <span class="text-sm">{{ getEmotionalStateEmoji(lastEmotionalState) }}</span>
+                  <component
+                    :is="getEmotionalStateIcon(lastEmotionalState)"
+                    class="w-4 h-4"
+                    :class="getEmotionalStateColor(lastEmotionalState)"
+                    :title="lastEmotionalState"
+                  />
                 </div>
               </div>
               <button
@@ -172,8 +177,10 @@
                       type="checkbox"
                       class="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500"
                     />
-                    <label for="askAiDirectly" class="text-xs text-gray-600">
-                      🤖 Pedir respuesta automática de MotivBot
+                    <label for="askAiDirectly" class="text-xs text-gray-600 flex items-center space-x-1">
+                      <!-- ✅ CAMBIO: Usar icono en lugar de emoji -->
+                      <BeakerIcon class="w-4 h-4" />
+                      <span>Pedir respuesta automática de MotivBot</span>
                     </label>
                   </div>
                   <div class="flex space-x-2">
@@ -210,7 +217,12 @@
               <div v-if="conversations.length === 0 && !conversationsLoading" class="text-center py-8">
                 <ChatBubbleLeftRightIcon class="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p class="text-gray-500 text-sm">No hay conversaciones aún</p>
-                <p class="text-gray-400 text-xs">¡Sé el primero en comentar o preguntarle a MotivBot!</p>
+                <p class="text-gray-400 text-xs flex items-center justify-center space-x-1">
+                  <span>¡Sé el primero en comentar o preguntarle a</span>
+                  <!-- ✅ CAMBIO: Usar icono en lugar de emoji -->
+                  <BeakerIcon class="w-4 h-4" />
+                  <span>MotivBot!</span>
+                </p>
               </div>
             </div>
           </div>
@@ -332,7 +344,7 @@
                 </div>
               </div>
 
-              <!-- ✅ Estadísticas emocionales -->
+              <!-- ✅ CAMBIO: Estadísticas emocionales con iconos -->
               <div v-if="conversationStats.emotionalStateDistribution && Object.keys(conversationStats.emotionalStateDistribution).length > 0" class="pt-2 border-t border-gray-100">
                 <div class="text-xs text-gray-500 mb-2">Estados emocionales de MotivBot:</div>
                 <div class="grid grid-cols-4 gap-1">
@@ -342,7 +354,12 @@
                     class="text-center"
                     :title="`${state}: ${count} veces`"
                   >
-                    <div class="text-lg">{{ getEmotionalStateEmoji(state) }}</div>
+                    <!-- ✅ CAMBIO: Usar componente de icono dinámico -->
+                    <component
+                      :is="getEmotionalStateIcon(state)"
+                      class="w-5 h-5 mx-auto"
+                      :class="getEmotionalStateColor(state)"
+                    />
                     <div class="text-xs text-gray-400">{{ count }}</div>
                   </div>
                 </div>
@@ -416,14 +433,31 @@ import {
   PauseIcon,
   BoltIcon,
   LightBulbIcon,
-  XCircleIcon
+  XCircleIcon,
+  // ✅ Iconos para estados emocionales
+  FaceSmileIcon,
+  HeartIcon,
+  SparklesIcon,
+  EyeIcon,
+  HandRaisedIcon,
+  FireIcon,
+  CloudIcon,
+  BeakerIcon
 } from '@heroicons/vue/24/outline'
 import {
   ExclamationTriangleIcon as ExclamationTriangleIconSolid,
   FireIcon as FireIconSolid,
   CheckCircleIcon as CheckCircleIconSolid,
-  PlayIcon as PlayIconSolid
-
+  PlayIcon as PlayIconSolid,
+  // ✅ Iconos sólidos para estados emocionales
+  FaceSmileIcon as FaceSmileIconSolid,
+  HeartIcon as HeartIconSolid,
+  SparklesIcon as SparklesIconSolid,
+  EyeIcon as EyeIconSolid,
+  HandRaisedIcon as HandRaisedIconSolid,
+  FireIcon as FireIconSolidAlt,
+  BoltIcon as BoltIconSolid,
+  BeakerIcon as BeakerIconSolid
 } from '@heroicons/vue/24/solid'
 import { useSupabase } from '@/hooks/supabase'
 import { useConversationsCRUD } from '@/composables/useConversationsCRUD'
@@ -714,19 +748,34 @@ const updateConversationFeedback = async (conversationId, feedbackData) => {
   }
 }
 
-// ✅ Función para obtener emoji del estado emocional
-const getEmotionalStateEmoji = (state) => {
-  const emojis = {
-    happy: '😊',
-    excited: '🎉',
-    calm: '😌',
-    focused: '🎯',
-    supportive: '🤗',
-    encouraging: '💪',
-    thoughtful: '🤔',
-    energetic: '⚡'
+// ✅ Función para obtener icono del estado emocional
+const getEmotionalStateIcon = (state) => {
+  const icons = {
+    happy: FaceSmileIconSolid,
+    excited: SparklesIconSolid,
+    calm: CloudIcon,
+    focused: EyeIconSolid,
+    supportive: HandRaisedIconSolid,
+    encouraging: HeartIconSolid,
+    thoughtful: BeakerIconSolid,
+    energetic: BoltIconSolid
   }
-  return emojis[state] || '🤖'
+  return icons[state] || FaceSmileIconSolid
+}
+
+// ✅ Función para obtener color del estado emocional
+const getEmotionalStateColor = (state) => {
+  const colors = {
+    happy: 'text-yellow-500',
+    excited: 'text-orange-500',
+    calm: 'text-blue-500',
+    focused: 'text-purple-500',
+    supportive: 'text-green-500',
+    encouraging: 'text-pink-500',
+    thoughtful: 'text-indigo-500',
+    energetic: 'text-red-500'
+  }
+  return colors[state] || 'text-gray-500'
 }
 
 // Task Icon functions

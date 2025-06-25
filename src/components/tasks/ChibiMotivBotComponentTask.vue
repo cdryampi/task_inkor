@@ -33,7 +33,7 @@
     <!-- Mensaje contextual -->
     <div class="mb-6">
       <div
-        :class="[
+        :class=" [
           'rounded-xl p-5 transition-all duration-300 border shadow-sm',
           isThinking
             ? 'bg-primary-50 border-primary-200'
@@ -46,7 +46,7 @@
             <span
               v-for="n in 3"
               :key="n"
-              :class="[
+              :class=" [
                 'w-1.5 h-1.5 bg-primary-500 rounded-full animate-pulse',
                 `animation-delay-${(n-1) * 200}`
               ]"
@@ -65,7 +65,7 @@
             <span
               v-for="tag in currentTags"
               :key="tag"
-              :class="[
+              :class=" [
                 'text-xs px-3 py-1 rounded-full font-medium text-white transition-colors duration-200',
                 getTagColor(tag)
               ]"
@@ -82,18 +82,32 @@
       </div>
     </div>
 
-    <!-- Estado del asistente -->
+    <!-- Estado del asistente con iconos mejorados -->
     <div class="flex justify-between pt-4 border-t border-primary-100">
       <div class="flex flex-col items-center gap-1">
-        <span class="text-xs text-gray-500 uppercase tracking-wide font-medium">Estado:</span>
+        <span class="text-xs text-gray-500 uppercase tracking-wide font-medium flex items-center gap-1">
+          <!-- ✅ Añadir icono de estado -->
+          <component
+            :is="getEmotionalStateIcon(assistantMood)"
+            class="w-3 h-3"
+            :class="getEmotionalStateColor(assistantMood)"
+          />
+          Estado:
+        </span>
         <span class="text-sm font-semibold text-primary-600">{{ currentState }}</span>
       </div>
       <div class="flex flex-col items-center gap-1">
-        <span class="text-xs text-gray-500 uppercase tracking-wide font-medium">Contexto:</span>
+        <span class="text-xs text-gray-500 uppercase tracking-wide font-medium flex items-center gap-1">
+          <EyeIcon class="w-3 h-3" />
+          Contexto:
+        </span>
         <span class="text-sm font-semibold text-primary-600">{{ contextLevel }}</span>
       </div>
       <div class="flex flex-col items-center gap-1">
-        <span class="text-xs text-gray-500 uppercase tracking-wide font-medium">Modo:</span>
+        <span class="text-xs text-gray-500 uppercase tracking-wide font-medium flex items-center gap-1">
+          <BeakerIcon class="w-3 h-3" />
+          Modo:
+        </span>
         <span class="text-sm font-semibold text-primary-600">{{ aiMode }}</span>
       </div>
     </div>
@@ -114,6 +128,26 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import ChibiAvatar from '@/components/ui/ChibiAvatar.vue'
+import {
+  // ✅ Importar iconos para usar en el componente
+  EyeIcon,
+  BeakerIcon,
+  FaceSmileIcon,
+  HeartIcon,
+  SparklesIcon,
+  HandRaisedIcon,
+  CloudIcon,
+  BoltIcon
+} from '@heroicons/vue/24/outline'
+import {
+  FaceSmileIcon as FaceSmileIconSolid,
+  HeartIcon as HeartIconSolid,
+  SparklesIcon as SparklesIconSolid,
+  EyeIcon as EyeIconSolid,
+  HandRaisedIcon as HandRaisedIconSolid,
+  BeakerIcon as BeakerIconSolid,
+  BoltIcon as BoltIconSolid
+} from '@heroicons/vue/24/solid'
 
 // Props
 const props = defineProps({
@@ -395,6 +429,36 @@ const getFallbackMessage = () => {
 // Método para regenerar mensaje (solo desarrollo)
 const regenerateMessage = () => {
   updateMotivationalContent()
+}
+
+// Función para obtener icono del estado emocional
+const getEmotionalStateIcon = (state) => {
+  const icons = {
+    happy: FaceSmileIconSolid,
+    excited: SparklesIconSolid,
+    calm: CloudIcon,
+    focused: EyeIconSolid,
+    supportive: HandRaisedIconSolid,
+    encouraging: HeartIconSolid,
+    thoughtful: BeakerIconSolid,
+    energetic: BoltIconSolid
+  }
+  return icons[state] || FaceSmileIconSolid
+}
+
+// Función para obtener color del estado emocional
+const getEmotionalStateColor = (state) => {
+  const colors = {
+    happy: 'text-yellow-500',
+    excited: 'text-orange-500',
+    calm: 'text-blue-500',
+    focused: 'text-purple-500',
+    supportive: 'text-green-500',
+    encouraging: 'text-pink-500',
+    thoughtful: 'text-indigo-500',
+    energetic: 'text-red-500'
+  }
+  return colors[state] || 'text-gray-500'
 }
 
 // Watchers

@@ -31,9 +31,14 @@
           <span v-if="comment.role === 'assistant'" class="ai-badge">
             <SparklesIcon class="w-3 h-3" />
             AI
-            <span v-if="comment.emotional_state" class="ml-1 text-xs">
-              {{ getEmotionalStateLabel(comment.emotional_state) }}
-            </span>
+            <!-- ✅ CAMBIO: Usar icono en lugar de emoji -->
+            <component
+              v-if="comment.emotional_state"
+              :is="getEmotionalStateIcon(comment.emotional_state)"
+              class="w-3 h-3 ml-1"
+              :class="getEmotionalStateColor(comment.emotional_state)"
+              :title="comment.emotional_state"
+            />
           </span>
         </div>
         <div class="text-gray-500 text-sm">
@@ -111,7 +116,8 @@
       >
         <HandThumbUpIcon class="w-4 h-4" />
         <span>Útil</span>
-        <span v-if="comment.role === 'user' ? comment.user_is_useful : comment.assistant_is_useful" class="reaction-checkmark">✓</span>
+        <!-- ✅ CAMBIO: Usar icono CheckIcon en lugar de checkmark de texto -->
+        <CheckIcon v-if="comment.role === 'user' ? comment.user_is_useful : comment.assistant_is_useful" class="w-3 h-3 reaction-checkmark" />
       </button>
 
       <button
@@ -125,7 +131,7 @@
       >
         <CheckBadgeIcon class="w-4 h-4" />
         <span>Preciso</span>
-        <span v-if="comment.assistant_is_precise" class="reaction-checkmark">✓</span>
+        <CheckIcon v-if="comment.assistant_is_precise" class="w-3 h-3 reaction-checkmark" />
       </button>
 
       <button
@@ -138,7 +144,7 @@
       >
         <HeartIcon class="w-4 h-4" />
         <span>Gracias</span>
-        <span v-if="comment.role === 'user' ? comment.user_is_grateful : comment.assistant_is_grateful" class="reaction-checkmark">✓</span>
+        <CheckIcon v-if="comment.role === 'user' ? comment.user_is_grateful : comment.assistant_is_grateful" class="w-3 h-3 reaction-checkmark" />
       </button>
 
       <!-- Token Usage (solo para mensajes del asistente) -->
@@ -200,11 +206,26 @@ import {
   HandThumbUpIcon,
   HeartIcon,
   CheckBadgeIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  // ✅ Nuevos iconos para estados emocionales
+  FaceSmileIcon,
+  BoltIcon,
+  CloudIcon,
+  EyeIcon,
+  HandRaisedIcon,
+  BeakerIcon
 } from '@heroicons/vue/24/outline'
 import {
   SparklesIcon as SparklesIconSolid,
-  UserIcon as UserIconSolid
+  UserIcon as UserIconSolid,
+  // ✅ Iconos sólidos para estados emocionales
+  FaceSmileIcon as FaceSmileIconSolid,
+  BoltIcon as BoltIconSolid,
+  CloudIcon as CloudIconSolid,
+  EyeIcon as EyeIconSolid,
+  HandRaisedIcon as HandRaisedIconSolid,
+  BeakerIcon as BeakerIconSolid,
+  HeartIcon as HeartIconSolid
 } from '@heroicons/vue/24/solid'
 import ChibiAvatar from '../ui/ChibiAvatar.vue'
 
@@ -338,18 +359,34 @@ const toggleReaction = (type) => {
   emit('update-feedback', props.comment.id, feedbackData)
 }
 
-const getEmotionalStateLabel = (state) => {
-  const labels = {
-    happy: '😊',
-    excited: '🎉',
-    calm: '😌',
-    focused: '🎯',
-    supportive: '🤗',
-    encouraging: '💪',
-    thoughtful: '🤔',
-    energetic: '⚡'
+// ✅ NUEVA función con iconos en lugar de emojis
+const getEmotionalStateIcon = (state) => {
+  const icons = {
+    happy: FaceSmileIconSolid,
+    excited: SparklesIconSolid,
+    calm: CloudIconSolid,
+    focused: EyeIconSolid,
+    supportive: HandRaisedIconSolid,
+    encouraging: HeartIconSolid,
+    thoughtful: BeakerIconSolid,
+    energetic: BoltIconSolid
   }
-  return labels[state] || '🤖'
+  return icons[state] || FaceSmileIconSolid
+}
+
+// ✅ NUEVA función para colores de estados emocionales
+const getEmotionalStateColor = (state) => {
+  const colors = {
+    happy: 'text-yellow-500',
+    excited: 'text-orange-500',
+    calm: 'text-blue-500',
+    focused: 'text-purple-500',
+    supportive: 'text-green-500',
+    encouraging: 'text-pink-500',
+    thoughtful: 'text-indigo-500',
+    energetic: 'text-red-500'
+  }
+  return colors[state] || 'text-gray-500'
 }
 </script>
 
@@ -437,22 +474,21 @@ const getEmotionalStateLabel = (state) => {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15), inset 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* ✅ Checkmark para estados activos */
+/* ✅ Checkmark para estados activos - ahora es un icono */
 .reaction-checkmark {
-  font-size: 0.7rem;
-  font-weight: bold;
   margin-left: 2px;
   animation: checkmark-appear 0.3s ease-out;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
 }
 
 @keyframes checkmark-appear {
   0% {
     opacity: 0;
-    transform: scale(0.5);
+    transform: scale(0.5) rotate(-90deg);
   }
   100% {
     opacity: 1;
-    transform: scale(1);
+    transform: scale(1) rotate(0deg);
   }
 }
 
