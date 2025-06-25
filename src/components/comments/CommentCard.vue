@@ -148,11 +148,21 @@
       </button>
 
       <!-- Token Usage (solo para mensajes del asistente) -->
-      <div v-if="comment.role === 'assistant' && comment.tokens_used" class="ml-auto flex items-center text-xs text-gray-400">
-        <span>{{ comment.tokens_used }} tokens</span>
-        <span v-if="comment.response_time_ms" class="ml-2">
-          {{ Math.round(comment.response_time_ms / 1000) }}s
-        </span>
+      <div v-if="comment.role === 'assistant' && (comment.tokens_used || comment.model_used)" class="ml-auto flex items-center text-xs text-gray-400 gap-3">
+        <!-- Modelo utilizado -->
+        <div v-if="comment.model_used" class="flex items-center gap-1">
+          <CpuChipIcon class="w-3 h-3" />
+          <span class="font-mono">{{ formatModelName(comment.model_used) }}</span>
+        </div>
+
+        <!-- Tokens y tiempo de respuesta -->
+        <div v-if="comment.tokens_used" class="flex items-center gap-2">
+          <span>{{ comment.tokens_used }} tokens</span>
+          <span v-if="comment.response_time_ms" class="flex items-center gap-1">
+            <ClockIcon class="w-3 h-3" />
+            {{ Math.round(comment.response_time_ms / 1000) }}s
+          </span>
+        </div>
       </div>
     </div>
 
@@ -207,6 +217,8 @@ import {
   HeartIcon,
   CheckBadgeIcon,
   ExclamationTriangleIcon,
+  CpuChipIcon,
+  ClockIcon,
   // ✅ Nuevos iconos para estados emocionales
   FaceSmileIcon,
   BoltIcon,
@@ -387,6 +399,23 @@ const getEmotionalStateColor = (state) => {
     energetic: 'text-red-500'
   }
   return colors[state] || 'text-gray-500'
+}
+
+// ✅ NUEVA función para formatear nombres de modelos
+const formatModelName = (modelName) => {
+  // Mapeo de nombres de modelos para mostrar versiones más amigables
+  const modelDisplayNames = {
+    'gpt-4': 'GPT-4',
+    'gpt-4-turbo': 'GPT-4 Turbo',
+    'gpt-4o': 'GPT-4o',
+    'gpt-4o-mini': 'GPT-4o Mini',
+    'gpt-3.5-turbo': 'GPT-3.5',
+    'claude-3-sonnet': 'Claude 3',
+    'claude-3-haiku': 'Claude 3 Haiku',
+    'gemini-pro': 'Gemini Pro'
+  }
+
+  return modelDisplayNames[modelName] || modelName
 }
 </script>
 

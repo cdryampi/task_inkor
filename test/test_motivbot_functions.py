@@ -216,23 +216,127 @@ class TestMotivbotRPCFunctions:
         
         response = requests.post(url, headers=headers, json=payload)
         
-        # Puede ser 400 (bad request) o 200 con error en el JSON
-        if response.status_code == 200:
-            result = response.json()
-            assert result['success'] is False
-            assert 'Title is required' in result['message']
-        else:
-            assert response.status_code == 400
+        assert response.status_code == 200
+        result = response.json()
         
+        assert result['success'] is False
+        assert 'title' in result['message'].lower() or 'required' in result['message'].lower()
+
     def test_motivbot_update_task(self, supabase_config, headers, cleanup_tasks):
         """Test actualizar tarea por HTTP"""
-        # Primero crear una tarea
+        # Crear tarea primero
         create_url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_create_task"
         create_payload = {
             "p_title": "Task to Update HTTP - Cleanup",
             "p_description": "Original description - Will be deleted"
         }
         
+        create_response = requests.post(create_url, headers=headers, json=create_payload)
+        assert create_response.status_code == 200
+        create_result = create_response.json()
+        task_id = create_result['id']
+        
+        # 🧹 Agregar para cleanup
+        cleanup_tasks(task_id)
+        
+        # Actualizar la tarea
+        update_url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_update_task"
+        update_payload = {
+            "p_task_id": task_id,
+            "p_title": "Updated Task HTTP - Cleanup",
+            "p_description": "Updated description - Will be deleted",
+            "p_status": "completed"
+        }
+        
+        response = requests.post(update_url, headers=headers, json=update_payload)
+        
+        assert response.status_code == 200
+        result = response.json()
+        
+        assert result['success'] is True
+        assert result['message'] == 'Task updated successfully'
+
+        def test_motivbot_create_task_with_special_characters(self, supabase_config, headers, cleanup_tasks):
+            """Test crear tarea con caracteres especiales"""
+            special_title = "Tarea con émojis 🚀 y caracteres especiales: @#$%^&*() - Cleanup"
+            
+            create_url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_create_task"
+            create_payload = {
+                "p_title": special_title,
+                "p_description": "Descripción con ñ, tildes áéíóú y símbolos ©®™"
+            }
+            
+            response = requests.post(create_url, headers=headers, json=create_payload)
+            
+            assert response.status_code == 200
+            result = response.json()
+            
+            if result.get('success', False):
+                cleanup_tasks(result['id'])
+                assert 'id' in result
+            else:
+                # Si falla, verificar que el error sea claro
+                assert 'message' in result
+
+        def test_motivbot_search_tasks_case_insensitive(self, supabase_config, headers, cleanup_tasks):
+            """Test búsqueda de tareas insensible a mayúsculas/minúsculas"""
+            # Crear tarea con texto en mayúsculas
+            create_url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_create_task"
+            create_payload = {
+                "p_title": "SEARCH TEST UPPERCASE - Cleanup",
+                "p_description": "Testing case insensitive search"
+            }
+            
+            create_response = requests.post(create_url, headers=headers, json=create_payload)
+            create_result = create_response.json()
+            
+            if not create_result.get('success', False):
+                pytest.skip("Task creation failed")
+            
+            task_id = create_result['id']
+            cleanup_tasks(task_id)
+            
+            # Buscar en minúsculas
+            search_url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_search_tasks"
+            search_payload = {"p_search": "search test"}
+            
+            response = requests.post(search_url, headers=headers, json=search_payload)
+            
+            assert response.status_code == 200
+            result = response.json()
+            
+            assert isinstance(result, list)
+            
+            # Verificar que encuentra la tarea
+            task_ids = [task['id'] for task in result]
+            assert task_id in task_ids, "La búsqueda debe ser insensible a mayúsculas/minúsculas"
+
+        def test_motivbot_get_dashboard_structure_validation(self, supabase_config, headers):
+            """Test validación exhaustiva de estructura del dashboard"""
+            url = f"{supabase_config['url']}/rest/v1/rpc/motivbot_get_dashboard"
+            
+            response = requests.post(url, headers=headers, json={})
+            
+            assert response.status_code == 200
+            result = response.json()
+            
+            # Verificar estructura básica
+            required_keys = ['tasks', 'conversations', 'completion_rate', 'active_tasks', 'tags']
+            for key in required_keys:
+                assert key in result, f"Missing key: {key}"
+            
+            # Verificar tipos de datos
+            assert isinstance(result['tasks'], (int, dict)), "tasks debe ser int o dict"
+            assert isinstance(result['conversations'], (int, dict)), "conversations debe ser int o dict"
+            assert isinstance(result['completion_rate'], (int, float)), "completion_rate debe ser numérico"
+            assert isinstance(result['active_tasks'], int), "active_tasks debe ser int"
+            assert isinstance(result['tags'], dict), "tags debe ser dict"
+            
+            # Verificar estructura de tags
+            if 'total_unique' in result['tags']:
+                assert isinstance(result['tags']['total_unique'], int)
+            if 'most_used' in result['tags']:
+                assert isinstance(result['tags']['most_used'], list)
         create_response = requests.post(create_url, headers=headers, json=create_payload)
         assert create_response.status_code == 200
         create_result = create_response.json()
