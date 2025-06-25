@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     // Validate environment variables
     const openaiApiKey = process.env.OPENAI_API_KEY;
     const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+    const supabaseServiceKey = process.env.SUPABASE_ANON_KEY;
 
     if (!openaiApiKey) {
       console.error('❌ OPENAI_API_KEY not configured');
