@@ -101,6 +101,7 @@ TIPOS DE TAGS DISPONIBLES:
 - Energía: alta-energia, baja-energia, creativo, administrativo
 - Ubicación: casa, oficina, exterior, online
 - Categoría: reunion, llamada, compras, ejercicio, lectura, planificacion
+- Puedes inventar tags nuevos si son relevantes por ejemplo: python, vuejs, tailwind, css, HTML, javascript, react, nodejs, backend, frontend, fullstack.
 
 REGLAS:
 - Máximo 5 tags por tarea
