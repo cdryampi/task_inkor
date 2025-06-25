@@ -48,24 +48,28 @@ export default async function handler(req, res) {
 
     // 🔄 PASO 1: Si hay task_id, procesar tags automáticamente
     let taskTags = [];
+    let currentTaskData = null;
+
     if (task_id && typeof task_id === 'number') {
       console.log(`🏷️ Processing task ID: ${task_id}`);
 
       try {
         // Obtener datos de la tarea
-        const { data: taskData, error: fetchError } = await supabase
+        const { data: fetchedTaskData, error: fetchError } = await supabase
           .from('task')
           .select('*')
           .eq('id', task_id)
           .maybeSingle();
 
-        if (!fetchError && taskData) {
+        if (!fetchError && fetchedTaskData) {
+          currentTaskData = fetchedTaskData;
+
           // Verificar si ya tiene tags
-          if (!taskData.tags || !Array.isArray(taskData.tags) || taskData.tags.length === 0) {
-            console.log(`🤖 Generating tags for task: "${taskData.title}"`);
+          if (!fetchedTaskData.tags || !Array.isArray(fetchedTaskData.tags) || fetchedTaskData.tags.length === 0) {
+            console.log(`🤖 Generating tags for task: "${fetchedTaskData.title}"`);
 
             // Generar tags con OpenAI
-            const generatedTags = await generateTaskTags(taskData, openaiApiKey);
+            const generatedTags = await generateTaskTags(fetchedTaskData, openaiApiKey);
 
             if (generatedTags.length > 0) {
               // Actualizar tarea con tags
@@ -75,10 +79,11 @@ export default async function handler(req, res) {
                 .eq('id', task_id);
 
               taskTags = generatedTags;
+              currentTaskData.tags = generatedTags; // Actualizar datos locales
               console.log(`✅ Tags assigned to task ${task_id}:`, taskTags);
             }
           } else {
-            taskTags = taskData.tags;
+            taskTags = fetchedTaskData.tags;
             console.log(`✅ Task ${task_id} already has tags:`, taskTags);
           }
         }
@@ -99,7 +104,7 @@ export default async function handler(req, res) {
           .select('*')
           .overlaps('tags', taskTags);
 
-        if (!messagesError && existingMessages && existingMessages.length >= 20) {
+        if (!messagesError && existingMessages && existingMessages.length >= 5) {
           console.log(`✅ Found ${existingMessages.length} existing messages for tags`);
 
           // Devolver mensajes existentes aleatoriamente
@@ -107,32 +112,41 @@ export default async function handler(req, res) {
             .sort(() => 0.5 - Math.random())
             .slice(0, 5);
 
+          // Seleccionar uno aleatorio para mostrar
+          const selectedMessage = randomMessages[0];
+
           return res.status(200).json({
             success: true,
             source: 'database',
-            data: randomMessages,
-            message: 'Messages retrieved from database',
+            data: {
+              mensaje: selectedMessage.mensaje,
+              estado: selectedMessage.estado,
+              tags: selectedMessage.tags || taskTags
+            },
+            all_messages: randomMessages, // Para debugging
+            message: 'Message retrieved from database',
             timestamp: new Date().toISOString()
           });
         } else {
           console.log(`⚠️ Only ${existingMessages?.length || 0} messages found for tags. Generating more...`);
 
-          // 🔄 PASO 3: Generar mensajes genéricos para los tags
-          await generateMessagesForTags(taskTags, supabase, openaiApiKey);
+          // 🔄 PASO 3: Generar mensajes genéricos para los tags y devolverlos
+          const generatedMessages = await generateMessagesForTags(taskTags, supabase, openaiApiKey);
 
-          // Intentar obtener mensajes nuevamente
-          const { data: newMessages } = await supabase
-            .from('chibi_messages')
-            .select('*')
-            .overlaps('tags', taskTags)
-            .limit(5);
+          if (generatedMessages && generatedMessages.length > 0) {
+            // Devolver uno de los mensajes generados
+            const selectedMessage = generatedMessages[0];
 
-          if (newMessages && newMessages.length > 0) {
             return res.status(200).json({
               success: true,
               source: 'generated',
-              data: newMessages,
-              message: 'New messages generated and retrieved',
+              data: {
+                mensaje: selectedMessage.mensaje,
+                estado: selectedMessage.estado,
+                tags: selectedMessage.tags || taskTags
+              },
+              all_generated: generatedMessages, // Para debugging
+              message: 'New messages generated and one selected',
               timestamp: new Date().toISOString()
             });
           }
@@ -145,6 +159,21 @@ export default async function handler(req, res) {
 
     // 🔄 PASO 4: Generar mensaje en tiempo real si no hay tags o falla la BD
     if (!message || typeof message !== 'string' || message.trim().length === 0) {
+      // Si no hay mensaje pero sí taskData, crear un mensaje contextual
+      if (currentTaskData) {
+        const contextualMessage = `Dame un mensaje motivacional para mi tarea: "${currentTaskData.title}"`;
+        console.log('🤖 Generating contextual message from task data...');
+        const realtimeMessage = await generateRealtimeMessage(contextualMessage, context, currentTaskData, conversationHistory, openaiApiKey);
+
+        return res.status(200).json({
+          success: true,
+          source: 'realtime',
+          data: realtimeMessage,
+          message: 'Contextual message generated from task',
+          timestamp: new Date().toISOString()
+        });
+      }
+
       return res.status(400).json({
         error: 'Bad request',
         message: 'Message is required for real-time generation'
@@ -152,7 +181,7 @@ export default async function handler(req, res) {
     }
 
     console.log('🤖 Generating real-time message...');
-    const realtimeMessage = await generateRealtimeMessage(message, context, taskData, conversationHistory, openaiApiKey);
+    const realtimeMessage = await generateRealtimeMessage(message, context, currentTaskData || taskData, conversationHistory, openaiApiKey);
 
     return res.status(200).json({
       success: true,
@@ -222,7 +251,23 @@ REGLAS: 2-4 tags, español sin tildes, minúsculas`;
 async function generateMessagesForTags(tags, supabase, openaiApiKey) {
   console.log(`🎯 Generating generic messages for tags:`, tags);
 
-  const systemPrompt = `Eres MotivBot. Genera 5 mensajes motivacionales genéricos para estas categorías: ${tags.join(', ')}
+  // Crear combinaciones de 2 tags máximo para mayor variedad
+  const tagCombinations = [];
+
+  // Añadir tags individuales
+  tags.forEach(tag => tagCombinations.push([tag]));
+
+  // Añadir combinaciones de 2 tags
+  for (let i = 0; i < tags.length; i++) {
+    for (let j = i + 1; j < tags.length; j++) {
+      tagCombinations.push([tags[i], tags[j]]);
+    }
+  }
+
+  // Limitar a máximo 3 combinaciones para no generar demasiados
+  const selectedCombinations = tagCombinations.slice(0, 3);
+
+  const systemPrompt = `Eres MotivBot 🤖💙. Genera exactamente 5 mensajes motivacionales genéricos.
 
 IMPORTANTE: Responde ÚNICAMENTE con este JSON:
 {
@@ -236,48 +281,72 @@ IMPORTANTE: Responde ÚNICAMENTE con este JSON:
 }
 
 REGLAS:
-- 5 mensajes diferentes
+- Exactamente 5 mensajes diferentes
 - Mensajes genéricos aplicables a múltiples situaciones
 - Estados emocionales variados
-- Incluir tags relevantes de la lista proporcionada`;
+- Máximo 150 caracteres por mensaje
+- Usar tags de la lista proporcionada
+- Mensajes siempre positivos y motivadores`;
+
+  const allGeneratedMessages = [];
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Genera mensajes para: ${tags.join(', ')}` }
-        ],
-        max_tokens: 800,
-        temperature: 0.8
-      })
-    });
+    for (const tagCombo of selectedCombinations) {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Genera 5 mensajes motivacionales para las categorías: ${tagCombo.join(', ')}` }
+          ],
+          max_tokens: 800,
+          temperature: 0.8
+        })
+      });
 
-    if (response.ok) {
-      const data = await response.json();
-      const result = JSON.parse(data.choices[0].message.content.trim());
+      if (response.ok) {
+        const data = await response.json();
+        const result = JSON.parse(data.choices[0].message.content.trim());
 
-      // Insertar mensajes en la base de datos
-      for (const msg of result.messages) {
-        await supabase
-          .from('chibi_messages')
-          .insert({
-            mensaje: msg.mensaje,
-            estado: msg.estado,
-            tags: msg.tags
-          });
+        if (result.messages && Array.isArray(result.messages)) {
+          // Insertar mensajes en la base de datos
+          for (const msg of result.messages) {
+            try {
+              const { data: insertedMessage, error: insertError } = await supabase
+                .from('chibi_messages')
+                .insert({
+                  mensaje: msg.mensaje,
+                  estado: msg.estado,
+                  tags: msg.tags || tagCombo
+                })
+                .select()
+                .single();
+
+              if (!insertError && insertedMessage) {
+                allGeneratedMessages.push(insertedMessage);
+              }
+            } catch (insertErr) {
+              console.error('❌ Error inserting message:', insertErr);
+            }
+          }
+        }
       }
 
-      console.log(`✅ Inserted ${result.messages.length} generic messages`);
+      // Pequeña pausa para no saturar la API
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
+
+    console.log(`✅ Generated and inserted ${allGeneratedMessages.length} messages total`);
+    return allGeneratedMessages;
+
   } catch (error) {
     console.error('❌ Error generating generic messages:', error);
+    return [];
   }
 }
 
@@ -292,7 +361,7 @@ IMPORTANTE: Responde ÚNICAMENTE con este JSON:
   "tags": ["tag1", "tag2", "tag3"]
 }
 
-PERSONALIDAD: Empático, motivador, usa emojis, mensajes concisos, enfoque en bienestar.
+PERSONALIDAD: Empático, motivador, usa emojis ocasionales, mensajes concisos, enfoque en bienestar.
 REGLAS: Máximo 150 caracteres, siempre positivo, 2-4 tags relevantes.`;
 
   const sanitizedMessage = message.trim().substring(0, 1000);
@@ -303,6 +372,7 @@ REGLAS: Máximo 150 caracteres, siempre positivo, 2-4 tags relevantes.`;
     if (taskData.title) taskInfo.push(`Título: ${taskData.title}`);
     if (taskData.priority) taskInfo.push(`Prioridad: ${taskData.priority}`);
     if (taskData.status) taskInfo.push(`Estado: ${taskData.status}`);
+    if (taskData.tags) taskInfo.push(`Tags: ${taskData.tags.join(', ')}`);
     if (taskInfo.length > 0) {
       userPrompt += `\n\nContexto de la tarea: ${taskInfo.join(', ')}`;
     }
@@ -332,17 +402,28 @@ REGLAS: Máximo 150 caracteres, siempre positivo, 2-4 tags relevantes.`;
 
     if (response.ok) {
       const data = await response.json();
-      const result = JSON.parse(data.choices[0].message.content.trim());
-      return result;
+      const contentStr = data.choices[0].message.content.trim();
+      const result = JSON.parse(contentStr);
+
+      // Validar que el resultado tenga la estructura correcta
+      if (result && result.mensaje && result.estado) {
+        return {
+          mensaje: result.mensaje.substring(0, 150), // Asegurar límite
+          estado: result.estado,
+          tags: result.tags || ['motivacional']
+        };
+      }
     }
   } catch (error) {
     console.error('❌ Error generating realtime message:', error);
   }
 
-  // Fallback
+  // Fallback mejorado con contexto de tarea si está disponible
+  const fallbackTags = taskData?.tags || ['motivacional', 'fuerza', 'positivo'];
+
   return {
     mensaje: "¡Sigue adelante, puedes lograr todo lo que te propongas! 💪✨",
     estado: "encouraging",
-    tags: ["motivacional", "fuerza", "positivo"]
+    tags: fallbackTags.slice(0, 3)
   };
 }
