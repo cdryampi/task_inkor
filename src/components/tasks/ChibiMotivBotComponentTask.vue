@@ -2,7 +2,7 @@
   <div class="bg-gradient-to-br from-primary-50 to-gray-50 rounded-2xl p-6 shadow-lg border border-primary-100 sticky top-8">
     <!-- Header del asistente -->
     <div class="flex items-center gap-4 mb-6 pb-4 border-b border-primary-100">
-      <!-- Usar ChibiAvatar en lugar del avatar manual -->
+      <!-- Usar ChibiAvatar -->
       <ChibiAvatar
         :emotional-state="assistantMood"
         size="large"
@@ -33,7 +33,7 @@
     <!-- Mensaje contextual -->
     <div class="mb-6">
       <div
-        :class=" [
+        :class="[
           'rounded-xl p-5 transition-all duration-300 border shadow-sm',
           isThinking
             ? 'bg-primary-50 border-primary-200'
@@ -46,7 +46,7 @@
             <span
               v-for="n in 3"
               :key="n"
-              :class=" [
+              :class="[
                 'w-1.5 h-1.5 bg-primary-500 rounded-full animate-pulse',
                 `animation-delay-${(n-1) * 200}`
               ]"
@@ -60,23 +60,33 @@
         <div v-else class="space-y-3">
           <p class="text-base leading-relaxed text-gray-700">{{ currentMessage }}</p>
 
-          <!-- Tags dinámicos desde OpenAI -->
+          <!-- ✅ MEJORADO: Tags con colores del estado emocional -->
           <div v-if="currentTags.length > 0" class="flex flex-wrap gap-2">
             <span
               v-for="tag in currentTags"
               :key="tag"
-              :class=" [
-                'text-xs px-3 py-1 rounded-full font-medium text-white transition-colors duration-200',
-                getTagColor(tag)
+              :class="[
+                'text-xs px-3 py-1.5 rounded-full font-medium text-white transition-all duration-200 hover:scale-105 shadow-sm flex items-center gap-1.5',
+                getEmotionalStateColorClass(assistantMood)
               ]"
+              :title="`Tag: ${getTagLabel(tag)} • Estado: ${assistantMood}`"
             >
+              <!-- ✅ NUEVO: Icono del estado emocional en cada tag -->
+              <component
+                :is="getEmotionalStateIcon(assistantMood)"
+                class="w-3 h-3"
+              />
               {{ getTagLabel(tag) }}
             </span>
           </div>
 
-          <!-- Fuente del mensaje -->
-          <div v-if="messageSource" class="text-xs text-gray-400 italic">
-            Fuente: {{ messageSource }}
+          <!-- ✅ SIMPLIFICADO: Fuente del mensaje sin debugging -->
+          <div v-if="messageSource" class="flex items-center gap-1 text-xs text-gray-400 italic">
+            <component
+              :is="getSourceIcon(messageSource)"
+              class="w-3 h-3"
+            />
+            <span>{{ messageSource }}</span>
           </div>
         </div>
       </div>
@@ -86,7 +96,6 @@
     <div class="flex justify-between pt-4 border-t border-primary-100">
       <div class="flex flex-col items-center gap-1">
         <span class="text-xs text-gray-500 uppercase tracking-wide font-medium flex items-center gap-1">
-          <!-- ✅ Añadir icono de estado -->
           <component
             :is="getEmotionalStateIcon(assistantMood)"
             class="w-3 h-3"
@@ -111,17 +120,6 @@
         <span class="text-sm font-semibold text-primary-600">{{ aiMode }}</span>
       </div>
     </div>
-
-    <!-- Botón de regenerar mensaje (solo en desarrollo) -->
-    <div v-if="isDevelopment" class="mt-4 pt-4 border-t border-primary-100">
-      <button
-        @click="regenerateMessage"
-        :disabled="isThinking"
-        class="w-full px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-      >
-        {{ isThinking ? 'Generando...' : 'Regenerar Mensaje' }}
-      </button>
-    </div>
   </div>
 </template>
 
@@ -129,7 +127,6 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import ChibiAvatar from '@/components/ui/ChibiAvatar.vue'
 import {
-  // ✅ Importar iconos para usar en el componente
   EyeIcon,
   BeakerIcon,
   FaceSmileIcon,
@@ -180,52 +177,27 @@ const assistantTitle = computed(() => {
   return 'Asistente de Tareas'
 })
 
-const isDevelopment = computed(() => {
-  return import.meta.env.DEV
-})
-
-// Métodos de servicios OpenAI
-const generateTaskTags = async (taskId) => {
-  if (!taskId) return []
-
-  try {
-    console.log(`🏷️ Generando tags para tarea ID: ${taskId}`)
-    console.log(`🔗 API URL: ${API_BASE_URL}/api/motivBotTaskAddTags`)
-
-    const response = await fetch(`${API_BASE_URL}/api/motivBotTaskAddTags`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        task_id: taskId
-      })
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-
-    const data = await response.json()
-
-    if (data.success) {
-      console.log('✅ Tags generados:', data.data.generated_tags || data.data.existing_tags)
-      return data.data.generated_tags || data.data.existing_tags || []
-    }
-
-    return []
-  } catch (error) {
-    console.error('❌ Error generando tags:', error)
-    isConnected.value = false
-    return []
-  }
+// ✅ FUNCIONES DE THINKING ANIMATION
+const simulateThinking = (message = 'Pensando...') => {
+  isThinking.value = true
+  thinkingMessage.value = message
+  currentState.value = 'Pensando'
 }
 
+const stopThinking = () => {
+  isThinking.value = false
+  currentState.value = 'Listo'
+}
+
+// ✅ MÉTODO PARA REGENERAR MENSAJE (uso interno)
+const regenerateMessage = async () => {
+  if (!props.task) return
+  await updateMotivationalContent()
+}
+
+// Métodos de servicios OpenAI
 const generateMotivationalMessage = async (taskData = null, customMessage = null) => {
   try {
-    console.log('🤖 Generando mensaje motivacional con OpenAI...')
-    console.log(`🔗 API URL: ${API_BASE_URL}/api/motivBotMessagesOpenIA`)
-
     const requestBody = {
       message: customMessage || 'Dame un mensaje motivacional para esta tarea',
       context: 'task_assistant',
@@ -248,31 +220,19 @@ const generateMotivationalMessage = async (taskData = null, customMessage = null
 
     const data = await response.json()
 
-    if (data.success) {
-      console.log('✅ Mensaje generado:', data)
-
-      // Manejar diferentes fuentes de respuesta
-      if (data.source === 'database' && Array.isArray(data.data)) {
-        // Mensajes de base de datos
-        const randomMessage = data.data[Math.floor(Math.random() * data.data.length)]
-        return {
-          mensaje: randomMessage.mensaje,
-          estado: randomMessage.estado,
-          tags: randomMessage.tags || [],
-          source: 'Base de datos'
-        }
-      } else if (data.source === 'realtime' || data.source === 'generated') {
-        // Mensaje en tiempo real
-        return {
-          mensaje: data.data.mensaje,
-          estado: data.data.estado,
-          tags: data.data.tags || [],
-          source: data.source === 'realtime' ? 'Tiempo real' : 'Generado'
-        }
+    if (data.success && data.data) {
+      const messageData = {
+        mensaje: data.data.mensaje,
+        estado: data.data.estado || 'supportive',
+        tags: data.data.tags || [],
+        source: getSourceLabel(data.source)
       }
+
+      return messageData
     }
 
-    return null
+    throw new Error('Respuesta de API inválida')
+
   } catch (error) {
     console.error('❌ Error generando mensaje:', error)
     isConnected.value = false
@@ -280,158 +240,62 @@ const generateMotivationalMessage = async (taskData = null, customMessage = null
   }
 }
 
-// Métodos de utilidad
-const getTagColor = (tag) => {
-  const colorMap = {
-    // Colores por tipo de tag
-    urgente: 'bg-red-500',
-    importante: 'bg-orange-500',
-    trabajo: 'bg-blue-500',
-    personal: 'bg-green-500',
-    reunion: 'bg-purple-500',
-    llamada: 'bg-cyan-500',
-    email: 'bg-amber-500',
-    coding: 'bg-indigo-500',
-    design: 'bg-pink-500',
-    review: 'bg-gray-500',
-    completed: 'bg-green-600',
-    progress: 'bg-blue-600',
-    pending: 'bg-gray-400',
-    // Colores por tecnología
-    python: 'bg-yellow-600',
-    javascript: 'bg-yellow-500',
-    vuejs: 'bg-green-600',
-    react: 'bg-blue-400',
-    nodejs: 'bg-green-700',
-    html: 'bg-orange-600',
-    css: 'bg-blue-500',
-    tailwind: 'bg-teal-500'
+// ✅ FUNCIÓN: Convertir source a etiqueta legible
+const getSourceLabel = (source) => {
+  const sourceLabels = {
+    'database': 'Base de datos',
+    'generated': 'Generado IA',
+    'realtime': 'Tiempo real',
+    'fallback': 'Fallback'
   }
-
-  return colorMap[tag.toLowerCase()] || 'bg-primary-500'
+  return sourceLabels[source] || source || 'Desconocido'
 }
 
+// ✅ FUNCIÓN: Obtener icono según la fuente del mensaje
+const getSourceIcon = (source) => {
+  const iconMap = {
+    'Base de datos': BeakerIcon,
+    'Generado IA': SparklesIcon,
+    'Tiempo real': BoltIcon,
+    'Sistema': EyeIcon,
+    'Fallback': CloudIcon
+  }
+  return iconMap[source] || EyeIcon
+}
+
+// ✅ FUNCIÓN: Obtener etiqueta amigable para tags
 const getTagLabel = (tag) => {
-  const labelMap = {
+  const labels = {
+    'alta-energia': 'Alta Energía',
+    'baja-energia': 'Baja Energía',
+    'in-progress': 'En Progreso',
     urgente: 'Urgente',
     importante: 'Importante',
+    completado: 'Completado',
+    progreso: 'En Progreso',
+    pendiente: 'Pendiente',
     trabajo: 'Trabajo',
     personal: 'Personal',
+    estudio: 'Estudio',
+    hogar: 'Hogar',
+    salud: 'Salud',
+    social: 'Social',
+    rapido: 'Rápido',
+    largo: 'Largo Plazo',
+    creativo: 'Creativo',
+    administrativo: 'Admin',
     reunion: 'Reunión',
     llamada: 'Llamada',
-    email: 'Email',
-    coding: 'Código',
-    design: 'Diseño',
-    review: 'Revisión',
-    completed: 'Completado',
-    progress: 'En Progreso',
-    pending: 'Pendiente',
-    python: 'Python',
-    javascript: 'JavaScript',
-    vuejs: 'Vue.js',
-    react: 'React',
-    nodejs: 'Node.js',
-    html: 'HTML',
-    css: 'CSS',
-    tailwind: 'Tailwind'
+    general: 'General',
+    motivacional: 'Motivacional',
+    fuerza: 'Fuerza',
+    positivo: 'Positivo'
   }
 
-  return labelMap[tag.toLowerCase()] || tag.charAt(0).toUpperCase() + tag.slice(1)
+  return labels[tag] || tag.charAt(0).toUpperCase() + tag.slice(1)
 }
 
-const simulateThinking = (message = 'Analizando tu tarea...') => {
-  isThinking.value = true
-  thinkingMessage.value = message
-  currentState.value = 'Analizando'
-}
-
-const stopThinking = () => {
-  isThinking.value = false
-  currentState.value = 'Activo'
-  isConnected.value = true
-}
-
-// Método principal para actualizar contenido
-const updateMotivationalContent = async () => {
-  if (!props.task) {
-    // Sin tarea, mostrar mensaje genérico
-    currentMessage.value = '¡Hola! Estoy aquí para ayudarte con tus tareas 🚀'
-    assistantMood.value = 'supportive'
-    currentTags.value = []
-    messageSource.value = null
-    contextLevel.value = 'Medio'
-    aiMode.value = 'Estándar'
-    return
-  }
-
-  simulateThinking('Conectando con OpenAI...')
-
-  try {
-    // Paso 1: Generar/obtener tags para la tarea
-    const tags = await generateTaskTags(props.task.id)
-    currentTags.value = tags
-
-    // Paso 2: Generar mensaje motivacional
-    thinkingMessage.value = 'Generando mensaje personalizado...'
-    const messageData = await generateMotivationalMessage(props.task)
-
-    if (messageData) {
-      currentMessage.value = messageData.mensaje
-      assistantMood.value = messageData.estado
-      messageSource.value = messageData.source
-
-      // Combinar tags de tarea con tags de mensaje
-      const allTags = [...new Set([...currentTags.value, ...messageData.tags])]
-      currentTags.value = allTags.slice(0, 5) // Máximo 5 tags
-
-      contextLevel.value = 'Alto'
-      aiMode.value = 'Inteligente'
-    } else {
-      // Fallback a mensaje estático
-      currentMessage.value = getFallbackMessage()
-      assistantMood.value = 'supportive'
-      messageSource.value = 'Fallback'
-      aiMode.value = 'Estándar'
-    }
-
-    console.log('💬 MotivBot - Contenido actualizado:', {
-      mensaje: currentMessage.value,
-      estado: assistantMood.value,
-      tags: currentTags.value,
-      fuente: messageSource.value,
-      task: props.task?.title || 'Sin tarea'
-    })
-
-  } catch (error) {
-    console.error('❌ Error actualizando contenido:', error)
-    currentMessage.value = getFallbackMessage()
-    assistantMood.value = 'supportive'
-    messageSource.value = 'Error'
-    isConnected.value = false
-  } finally {
-    stopThinking()
-  }
-}
-
-// Mensaje de fallback si falla OpenAI
-const getFallbackMessage = () => {
-  if (!props.task) return '¡Hola! Estoy aquí para ayudarte 🚀'
-
-  const { status, priority } = props.task
-
-  if (status === 'completed') return '¡Excelente trabajo! Tarea completada 🎉'
-  if (priority === 'high') return '¡Alta prioridad! Vamos con todo 🔥'
-  if (status === 'in-progress') return '¡Sigue así! Vas por buen camino 💪'
-
-  return '¡Vamos a completar esta tarea juntos! 🌟'
-}
-
-// Método para regenerar mensaje (solo desarrollo)
-const regenerateMessage = () => {
-  updateMotivationalContent()
-}
-
-// Función para obtener icono del estado emocional
+// ✅ FUNCIÓN: Obtener icono del estado emocional
 const getEmotionalStateIcon = (state) => {
   const icons = {
     happy: FaceSmileIconSolid,
@@ -441,12 +305,15 @@ const getEmotionalStateIcon = (state) => {
     supportive: HandRaisedIconSolid,
     encouraging: HeartIconSolid,
     thoughtful: BeakerIconSolid,
-    energetic: BoltIconSolid
+    energetic: BoltIconSolid,
+    peaceful: CloudIcon,
+    confident: EyeIconSolid,
+    playful: SparklesIconSolid
   }
-  return icons[state] || FaceSmileIconSolid
+  return icons[state] || HandRaisedIconSolid
 }
 
-// Función para obtener color del estado emocional
+// ✅ FUNCIÓN: Obtener color del estado emocional (para texto/iconos)
 const getEmotionalStateColor = (state) => {
   const colors = {
     happy: 'text-yellow-500',
@@ -456,21 +323,159 @@ const getEmotionalStateColor = (state) => {
     supportive: 'text-green-500',
     encouraging: 'text-pink-500',
     thoughtful: 'text-indigo-500',
-    energetic: 'text-red-500'
+    energetic: 'text-red-500',
+    peaceful: 'text-cyan-500',
+    confident: 'text-emerald-500',
+    playful: 'text-violet-500'
   }
   return colors[state] || 'text-gray-500'
+}
+
+// ✅ NUEVA FUNCIÓN: Obtener clase de color de fondo para tags basada en estado emocional
+const getEmotionalStateColorClass = (state) => {
+  const colorClasses = {
+    happy: 'bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600',
+    excited: 'bg-gradient-to-r from-orange-400 to-orange-500 hover:from-orange-500 hover:to-orange-600',
+    calm: 'bg-gradient-to-r from-blue-400 to-blue-500 hover:from-blue-500 hover:to-blue-600',
+    focused: 'bg-gradient-to-r from-purple-400 to-purple-500 hover:from-purple-500 hover:to-purple-600',
+    supportive: 'bg-gradient-to-r from-green-400 to-green-500 hover:from-green-500 hover:to-green-600',
+    encouraging: 'bg-gradient-to-r from-pink-400 to-pink-500 hover:from-pink-500 hover:to-pink-600',
+    thoughtful: 'bg-gradient-to-r from-indigo-400 to-indigo-500 hover:from-indigo-500 hover:to-indigo-600',
+    energetic: 'bg-gradient-to-r from-red-400 to-red-500 hover:from-red-500 hover:to-red-600',
+    peaceful: 'bg-gradient-to-r from-cyan-400 to-cyan-500 hover:from-cyan-500 hover:to-cyan-600',
+    confident: 'bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-500 hover:to-emerald-600',
+    playful: 'bg-gradient-to-r from-violet-400 to-violet-500 hover:from-violet-500 hover:to-violet-600'
+  }
+  return colorClasses[state] || 'bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600'
+}
+
+// ✅ MÉTODO: Actualizar contenido motivacional
+const updateMotivationalContent = async () => {
+  if (!props.task) {
+    currentMessage.value = '¡Hola! Estoy aquí para ayudarte con tus tareas 🚀'
+    assistantMood.value = 'supportive'
+    currentTags.value = []
+    messageSource.value = null
+    contextLevel.value = 'Medio'
+    aiMode.value = 'Estándar'
+    isConnected.value = true
+    return
+  }
+
+  simulateThinking('Conectando con OpenAI...')
+
+  try {
+    thinkingMessage.value = 'Generando mensaje personalizado...'
+    const messageData = await generateMotivationalMessage(props.task)
+
+    if (messageData) {
+      currentMessage.value = messageData.mensaje
+      assistantMood.value = messageData.estado
+      currentTags.value = messageData.tags || []
+      messageSource.value = messageData.source
+      isConnected.value = true
+
+      // Configuración de contexto basada en source
+      if (messageData.source === 'Base de datos') {
+        contextLevel.value = 'Alto'
+        aiMode.value = 'Optimizado'
+      } else if (messageData.source === 'Generado IA') {
+        contextLevel.value = 'Alto'
+        aiMode.value = 'Creativo'
+      } else if (messageData.source === 'Tiempo real') {
+        contextLevel.value = 'Máximo'
+        aiMode.value = 'Inteligente'
+      }
+    } else {
+      handleFallback()
+    }
+
+  } catch (error) {
+    console.error('❌ Error actualizando contenido:', error)
+    handleFallback()
+  } finally {
+    stopThinking()
+  }
+}
+
+// ✅ MÉTODO: Manejo de fallback
+const handleFallback = () => {
+  currentMessage.value = getFallbackMessage()
+  assistantMood.value = 'supportive'
+  currentTags.value = getFallbackTags()
+  messageSource.value = 'Sistema'
+  contextLevel.value = 'Básico'
+  aiMode.value = 'Estándar'
+  isConnected.value = false
+}
+
+// ✅ FUNCIÓN: Tags de fallback basados en la tarea
+const getFallbackTags = () => {
+  if (!props.task) return ['general']
+
+  const tags = []
+
+  if (props.task.priority === 'high') tags.push('urgente')
+  else if (props.task.priority === 'medium') tags.push('importante')
+
+  if (props.task.status === 'completed') tags.push('completado')
+  else if (props.task.status === 'in-progress') tags.push('progreso')
+  else tags.push('pendiente')
+
+  if (props.task.tags && Array.isArray(props.task.tags)) {
+    tags.push(...props.task.tags.slice(0, 2))
+  }
+
+  return tags.slice(0, 3)
+}
+
+// ✅ FUNCIÓN: Mensaje de fallback contextual
+const getFallbackMessage = () => {
+  if (!props.task) return '¡Hola! Estoy aquí para ayudarte 🚀'
+
+  const { status, priority, title } = props.task
+  const taskName = title ? title.substring(0, 30) : 'esta tarea'
+
+  const fallbackMessages = {
+    completed: [
+      '¡Excelente trabajo completando esta tarea! 🎉',
+      '¡Misión cumplida! Has terminado con éxito 🌟'
+    ],
+    'high-priority': [
+      `¡Alta prioridad! Vamos con todo en "${taskName}" 🔥`,
+      '¡Momento de brillar! Esta tarea importante te espera ⚡'
+    ],
+    'in-progress': [
+      `¡Sigue así con "${taskName}"! Vas por buen camino 💪`,
+      '¡Excelente progreso! Cada paso te acerca al éxito 🚀'
+    ],
+    default: [
+      `¡Vamos a completar "${taskName}" juntos! 🌟`,
+      '¡Tu potencial es ilimitado! Hagamos esto realidad ✨'
+    ]
+  }
+
+  let messageArray = fallbackMessages.default
+
+  if (status === 'completed') {
+    messageArray = fallbackMessages.completed
+  } else if (priority === 'high') {
+    messageArray = fallbackMessages['high-priority']
+  } else if (status === 'in-progress') {
+    messageArray = fallbackMessages['in-progress']
+  }
+
+  return messageArray[Math.floor(Math.random() * messageArray.length)]
 }
 
 // Watchers
 watch(() => props.task, (newTask) => {
   if (newTask) {
-    console.log('🔄 MotivBot - Nueva tarea detectada:', newTask.title)
     updateMotivationalContent()
   }
 }, { immediate: true, deep: true })
 
 onMounted(() => {
-  console.log('🚀 MotivBot - Componente montado con integración OpenAI')
   updateMotivationalContent()
 })
 </script>
