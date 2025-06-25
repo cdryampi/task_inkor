@@ -7,7 +7,9 @@
     "dev": "vercel dev",
     "start": "node api/proxy.js"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.0"
+  },
   "engines": {
     "node": "18.x"
   }
