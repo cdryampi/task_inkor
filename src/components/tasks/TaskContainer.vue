@@ -69,7 +69,6 @@
         <div>
           <p class="text-sm text-gray-600">
             Mostrando {{ startIndex + 1 }}-{{ Math.min(endIndex, filteredTasks.length) }} de {{ filteredTasks.length }} tareas
-            <span v-if="isLimitedView" class="text-primary-600">(vista optimizada)</span>
           </p>
         </div>
 
@@ -255,10 +254,7 @@ const filters = ref({
 const currentPage = ref(1)
 const itemsPerPage = ref(10)
 
-// ✅ INDICADOR SI ESTAMOS EN VISTA LIMITADA
-const isLimitedView = computed(() => {
-  return filters.value.dueDate === 'today' || filters.value.dueDate === 'upcoming'
-})
+
 
 // Update filters
 const updateFilters = (newFilters) => {
