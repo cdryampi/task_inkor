@@ -15,11 +15,14 @@
     "@heroicons/vue": "^2.2.0",
     "@supabase/supabase-js": "^2.50.0",
     "@tailwindcss/vite": "^4.1.8",
+    "chart.js": "^4.5.0",
+    "chartjs-plugin-zoom": "^2.2.0",
     "flowbite": "^3.1.2",
     "notivue": "^2.4.5",
     "tailwindcss": "^4.1.8",
     "v-calendar": "^3.1.2",
     "vue": "^3.5.13",
+    "vue-chartjs": "^5.3.2",
     "vue-router": "^4.5.0"
   },
   "devDependencies": {

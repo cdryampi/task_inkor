@@ -638,6 +638,67 @@ export const useSupabase = () => {
     }
   }
 
+  // ✅ Función auxiliar para productividad semanal
+  const getWeeklyProductivity = () => {
+    const last7Days = Array.from({length: 7}, (_, i) => {
+      const date = new Date()
+      date.setDate(date.getDate() - i)
+      return date.toISOString().split('T')[0]
+    }).reverse()
+
+    return last7Days.map(date => ({
+      date,
+      completed: tasks.value.filter(t =>
+        t.status === 'completed' &&
+        t.updated_at?.startsWith(date)
+      ).length,
+      label: new Date(date).toLocaleDateString('es-ES', {weekday: 'short'})
+    }))
+  }
+
+  // ✅ Nueva función para estadísticas
+  const getTasksStatistics = async () => {
+    try {
+      loading.value = true
+      error.value = null
+
+      await getTasks() // Cargar todas las tareas
+
+      console.log('🔍 Tasks loaded:', tasks.value) // Debug
+
+      // Calcular estadísticas
+      const stats = {
+        // Contadores por estado
+        pending: tasks.value.filter(t => t.status === 'pending').length,
+        inProgress: tasks.value.filter(t => t.status === 'in-progress').length, // ✅ Verificar este valor
+        completed: tasks.value.filter(t => t.status === 'completed').length,
+
+        // Contadores por prioridad
+        priority: {
+          high: tasks.value.filter(t => t.priority === 'high').length,
+          medium: tasks.value.filter(t => t.priority === 'medium').length,
+          normal: tasks.value.filter(t => t.priority === 'normal').length
+        },
+
+        // Productividad de los últimos 7 días
+        weeklyProductivity: getWeeklyProductivity(),
+
+        // Total de tareas
+        total: tasks.value.length
+      }
+
+      console.log('📊 Stats calculated:', stats) // Debug
+
+      return stats
+    } catch (err) {
+      console.error('Error al obtener estadísticas:', err)
+      error.value = 'Error al cargar las estadísticas'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     // Estado reactivo
     tasks,
@@ -668,6 +729,8 @@ export const useSupabase = () => {
     // Nuevos métodos para mensajes de la tabla 'chibi_messages'
     getRandomMessages,
     // Cliente directo para casos especiales
-    supabase
+    supabase,
+    // Método para obtener estadísticas
+    getTasksStatistics
   }
 }
