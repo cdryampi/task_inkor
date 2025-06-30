@@ -62,24 +62,114 @@
       </div>
     </div>
 
-    <!-- Results count -->
-    <div v-if="!loading && filteredTasks.length !== allTasks.length" class="mb-4">
-      <p class="text-sm text-gray-600">
-        Mostrando {{ filteredTasks.length }} de {{ allTasks.length }} tareas
-        <span v-if="isLimitedView" class="text-primary-600">(limitado a 10 por rendimiento)</span>
-      </p>
+    <!-- ✅ Controles de paginación y tareas por página -->
+    <div v-if="!loading && filteredTasks.length > 0" class="mb-4 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <!-- Info de resultados -->
+        <div>
+          <p class="text-sm text-gray-600">
+            Mostrando {{ startIndex + 1 }}-{{ Math.min(endIndex, filteredTasks.length) }} de {{ filteredTasks.length }} tareas
+            <span v-if="isLimitedView" class="text-primary-600">(vista optimizada)</span>
+          </p>
+        </div>
+
+        <!-- Controles -->
+        <div class="flex items-center gap-4">
+          <!-- Tareas por página -->
+          <div class="flex items-center gap-2">
+            <label class="text-sm text-gray-600">Por página:</label>
+            <select
+              v-model="itemsPerPage"
+              @change="resetPagination"
+              class="px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            >
+              <option :value="5">5</option>
+              <option :value="10">10</option>
+              <option :value="20">20</option>
+              <option :value="50">50</option>
+            </select>
+          </div>
+
+          <!-- Mini paginador (solo si hay muchas páginas) -->
+          <div v-if="totalPages > 1" class="text-sm text-gray-500">
+            Página {{ currentPage }} de {{ totalPages }}
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Tasks list usando TaskCard -->
-    <div v-if="!loading && filteredTasks.length > 0" class="space-y-4">
+    <!-- ✅ Tasks list paginadas usando TaskCard -->
+    <div v-if="!loading && paginatedTasks.length > 0" class="space-y-4">
       <TaskCard
-        v-for="task in filteredTasks"
+        v-for="task in paginatedTasks"
         :key="task.id"
         :task="formatTaskForCard(task)"
         @update-task="handleUpdateTask"
         @delete-task="handleDeleteTask"
         @update-status="handleUpdateStatus"
       />
+    </div>
+
+    <!-- ✅ Paginador principal -->
+    <div v-if="!loading && filteredTasks.length > 0 && totalPages > 1" class="mt-8 flex items-center justify-center">
+      <nav class="flex items-center space-x-2">
+        <!-- Botón primera página -->
+        <button
+          @click="goToPage(1)"
+          :disabled="currentPage === 1"
+          class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Primera página"
+        >
+          ««
+        </button>
+
+        <!-- Botón página anterior -->
+        <button
+          @click="goToPage(currentPage - 1)"
+          :disabled="currentPage === 1"
+          class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Página anterior"
+        >
+          ‹
+        </button>
+
+        <!-- Números de página -->
+        <template v-for="page in visiblePages" :key="page">
+          <button
+            v-if="page !== '...'"
+            @click="goToPage(page)"
+            :class="[
+              'px-3 py-2 text-sm font-medium rounded-lg',
+              page === currentPage
+                ? 'text-white bg-primary-600 border border-primary-600'
+                : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
+            ]"
+          >
+            {{ page }}
+          </button>
+          <span v-else class="px-3 py-2 text-sm text-gray-400">...</span>
+        </template>
+
+        <!-- Botón página siguiente -->
+        <button
+          @click="goToPage(currentPage + 1)"
+          :disabled="currentPage === totalPages"
+          class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Página siguiente"
+        >
+          ›
+        </button>
+
+        <!-- Botón última página -->
+        <button
+          @click="goToPage(totalPages)"
+          :disabled="currentPage === totalPages"
+          class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Última página"
+        >
+          »»
+        </button>
+      </nav>
     </div>
 
     <!-- Empty state -->
@@ -161,6 +251,10 @@ const filters = ref({
   sortOrder: 'asc'
 })
 
+// ✅ PAGINACIÓN
+const currentPage = ref(1)
+const itemsPerPage = ref(10)
+
 // ✅ INDICADOR SI ESTAMOS EN VISTA LIMITADA
 const isLimitedView = computed(() => {
   return filters.value.dueDate === 'today' || filters.value.dueDate === 'upcoming'
@@ -169,6 +263,7 @@ const isLimitedView = computed(() => {
 // Update filters
 const updateFilters = (newFilters) => {
   filters.value = { ...newFilters }
+  resetPagination() // ✅ Reset paginación cuando cambian filtros
 }
 
 const clearFilters = () => {
@@ -180,6 +275,7 @@ const clearFilters = () => {
     sortBy: 'due_time',
     sortOrder: 'asc'
   }
+  resetPagination() // ✅ Reset paginación
 
   // ✅ NOTIFICACIÓN PARA LIMPIAR FILTROS
   push.info({
@@ -195,11 +291,11 @@ const loadTasksBasedOnFilters = async () => {
 
     // Usar métodos específicos para casos optimizados
     if (filters.value.dueDate === 'today') {
-      console.log('📅 Cargando tareas de hoy (límite 10)')
-      await getTodaysTasks(10)
+      console.log('📅 Cargando tareas de hoy (optimizado)')
+      await getTodaysTasks(100) // ✅ Aumentar límite para paginación local
     } else if (filters.value.dueDate === 'upcoming') {
-      console.log('🔮 Cargando tareas próximas (límite 10)')
-      await getUpcomingTasks(10)
+      console.log('🔮 Cargando tareas próximas (optimizado)')
+      await getUpcomingTasks(100) // ✅ Aumentar límite para paginación local
     } else {
       console.log('📋 Cargando todas las tareas')
       await getTasks()
@@ -225,6 +321,7 @@ watch(
         (newDueDate === 'today' || newDueDate === 'upcoming')) {
       loadTasksBasedOnFilters()
     }
+    resetPagination() // ✅ Reset paginación cuando cambia fecha
   }
 )
 
@@ -356,6 +453,77 @@ const filteredTasks = computed(() => {
 
   return filtered
 })
+
+// ✅ CÁLCULOS DE PAGINACIÓN
+const totalPages = computed(() => {
+  return Math.ceil(filteredTasks.value.length / itemsPerPage.value)
+})
+
+const startIndex = computed(() => {
+  return (currentPage.value - 1) * itemsPerPage.value
+})
+
+const endIndex = computed(() => {
+  return startIndex.value + itemsPerPage.value
+})
+
+// ✅ TAREAS PAGINADAS (las que se muestran en la página actual)
+const paginatedTasks = computed(() => {
+  return filteredTasks.value.slice(startIndex.value, endIndex.value)
+})
+
+// ✅ PÁGINAS VISIBLES EN EL PAGINADOR
+const visiblePages = computed(() => {
+  const pages = []
+  const total = totalPages.value
+  const current = currentPage.value
+
+  if (total <= 7) {
+    // Si hay 7 páginas o menos, mostrar todas
+    for (let i = 1; i <= total; i++) {
+      pages.push(i)
+    }
+  } else {
+    // Lógica para mostrar páginas con elipsis
+    if (current <= 4) {
+      // Cerca del inicio
+      for (let i = 1; i <= 5; i++) {
+        pages.push(i)
+      }
+      pages.push('...')
+      pages.push(total)
+    } else if (current >= total - 3) {
+      // Cerca del final
+      pages.push(1)
+      pages.push('...')
+      for (let i = total - 4; i <= total; i++) {
+        pages.push(i)
+      }
+    } else {
+      // En el medio
+      pages.push(1)
+      pages.push('...')
+      for (let i = current - 1; i <= current + 1; i++) {
+        pages.push(i)
+      }
+      pages.push('...')
+      pages.push(total)
+    }
+  }
+
+  return pages
+})
+
+// ✅ FUNCIONES DE PAGINACIÓN
+const goToPage = (page) => {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page
+  }
+}
+
+const resetPagination = () => {
+  currentPage.value = 1
+}
 
 // All tasks (for original sorting when no filters)
 const allTasks = computed(() => {
