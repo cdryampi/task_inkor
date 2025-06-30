@@ -308,7 +308,48 @@ export default async function handler(req, res) {
                 priority = 'low';
               }
 
-              // Crear nueva tarea - cambiar tags a array
+              // ✅ Calcular fechas basadas en prioridad y estado
+              const now = new Date();
+              let dueDate, dueTime;
+
+              if (issue.state === 'open') {
+                // Para issues abiertos, asignar fecha según prioridad
+                switch (priority) {
+                  case 'high':
+                    // Alta prioridad: vence hoy
+                    dueDate = now.toISOString().split('T')[0];
+                    dueTime = '18:00'; // 6 PM
+                    break;
+                  case 'medium':
+                    // Prioridad media: vence en 3 días
+                    const mediumDue = new Date(now);
+                    mediumDue.setDate(mediumDue.getDate() + 3);
+                    dueDate = mediumDue.toISOString().split('T')[0];
+                    dueTime = '17:00'; // 5 PM
+                    break;
+                  case 'low':
+                    // Prioridad baja: vence en 7 días
+                    const lowDue = new Date(now);
+                    lowDue.setDate(lowDue.getDate() + 7);
+                    dueDate = lowDue.toISOString().split('T')[0];
+                    dueTime = '16:00'; // 4 PM
+                    break;
+                }
+              } else {
+                // Para issues cerrados, usar la fecha de cierre si está disponible
+                if (issue.closed_at) {
+                  const closedDate = new Date(issue.closed_at);
+                  dueDate = closedDate.toISOString().split('T')[0];
+                  dueTime = closedDate.toTimeString().slice(0, 5); // HH:MM
+                } else {
+                  // Si no hay fecha de cierre, usar fecha de creación
+                  const createdDate = new Date(issue.created_at);
+                  dueDate = createdDate.toISOString().split('T')[0];
+                  dueTime = createdDate.toTimeString().slice(0, 5);
+                }
+              }
+
+              // Crear nueva tarea con fechas
               const newTask = {
                 title: `[${repo.name}] ${issue.title}`,
                 description: `${issue.body || 'No description provided'}
@@ -320,13 +361,19 @@ export default async function handler(req, res) {
 👤 **Created by:** ${issue.user?.login || 'Unknown'}
 📊 **State:** ${issue.state}
 🆔 **GitHub ID:** ${issue.id}
+📅 **GitHub Created:** ${new Date(issue.created_at).toLocaleDateString()}
+${issue.closed_at ? `🔒 **GitHub Closed:** ${new Date(issue.closed_at).toLocaleDateString()}` : ''}
 
 ---
 *Sincronizado automáticamente desde GitHub*`,
                 tags: ['motivBotLinkIssuesFromGithub'],
                 status: issue.state === 'open' ? 'pending' : 'completed',
-                priority: priority
-                // ✅ Removidas todas las columnas github_*
+                priority: priority,
+                // ✅ Añadir fechas calculadas
+                due_date: dueDate,
+                due_time: dueTime,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
               };
 
               try {
@@ -340,7 +387,7 @@ export default async function handler(req, res) {
                   continue;
                 }
 
-                console.log(`✅ Created task for issue #${issue.number} in ${repo.full_name}: ${issue.title}`);
+                console.log(`✅ Created task for issue #${issue.number} in ${repo.full_name}: ${issue.title} (Due: ${dueDate} ${dueTime})`);
                 totalNewTasks++;
                 repoNewTasks++;
 
@@ -352,7 +399,9 @@ export default async function handler(req, res) {
                   issue_state: issue.state,
                   task_created: true,
                   task_id: insertedTask[0]?.id,
-                  priority: priority
+                  priority: priority,
+                  due_date: dueDate,
+                  due_time: dueTime
                 });
 
                 // Añadir la nueva tarea al array local para evitar duplicados en la misma ejecución
@@ -362,7 +411,7 @@ export default async function handler(req, res) {
                 console.error(`❌ Error inserting task for issue ${issue.number} in ${repo.full_name}:`, insertError);
               }
             } else {
-              console.log(`⏭️  Task already exists for issue #${issue.number} in ${repo.full_name}: ${issue.title}`);
+              console.log(`⏭️ Task already exists for issue #${issue.number} in ${repo.full_name}: ${issue.title}`);
               totalExistingTasks++;
               repoExistingTasks++;
 

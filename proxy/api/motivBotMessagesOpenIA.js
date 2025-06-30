@@ -64,27 +64,34 @@ export default async function handler(req, res) {
         if (!fetchError && fetchedTaskData) {
           currentTaskData = fetchedTaskData;
 
-          // Verificar si ya tiene tags
-          if (!fetchedTaskData.tags || !Array.isArray(fetchedTaskData.tags) || fetchedTaskData.tags.length === 0) {
-            console.log(`🤖 Generating tags for task: "${fetchedTaskData.title}"`);
+          // ✅ Verificar si ya tiene suficientes tags (necesita más de 1)
+          if (!fetchedTaskData.tags ||
+              !Array.isArray(fetchedTaskData.tags) ||
+              fetchedTaskData.tags.length <= 1) { // ✅ Cambio aquí: <= 1 en lugar de === 0
+
+            console.log(`🤖 Generating tags for task: "${fetchedTaskData.title}" (current tags: ${fetchedTaskData.tags?.length || 0})`);
 
             // Generar tags con OpenAI
             const generatedTags = await generateTaskTags(fetchedTaskData, openaiApiKey);
 
             if (generatedTags.length > 0) {
-              // Actualizar tarea con tags
+              // ✅ Si ya tenía 1 tag, combinarlo con los nuevos
+              const existingTags = fetchedTaskData.tags || [];
+              const allTags = [...new Set([...existingTags, ...generatedTags])]; // Evitar duplicados
+
+              // Actualizar tarea con tags combinados
               await supabase
                 .from('task')
-                .update({ tags: generatedTags })
+                .update({ tags: allTags })
                 .eq('id', task_id);
 
-              taskTags = generatedTags;
-              currentTaskData.tags = generatedTags; // Actualizar datos locales
-              console.log(`✅ Tags assigned to task ${task_id}:`, taskTags);
+              taskTags = allTags;
+              currentTaskData.tags = allTags; // Actualizar datos locales
+              console.log(`✅ Tags updated for task ${task_id}:`, taskTags);
             }
           } else {
             taskTags = fetchedTaskData.tags;
-            console.log(`✅ Task ${task_id} already has tags:`, taskTags);
+            console.log(`✅ Task ${task_id} already has enough tags (${taskTags.length}):`, taskTags);
           }
         }
       } catch (tagError) {

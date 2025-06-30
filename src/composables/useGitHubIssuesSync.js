@@ -6,7 +6,7 @@ const lastSyncResult = ref(null)
 
 export const useGitHubIssuesSync = () => {
 
-  // **SYNC** - Sincronizar issues de GitHub con tareas
+  // **SYNC** - Sincronizar issues de GitHub con tareas (crear nuevas)
   const syncGitHubIssues = async () => {
     isLoading.value = true
     error.value = null
@@ -14,13 +14,11 @@ export const useGitHubIssuesSync = () => {
     try {
       console.log('🔄 Iniciando sincronización de issues de GitHub...')
 
-      // 1. Obtener servidor proxy
       const proxyServer = import.meta.env.VITE_PROXY_SERVER
       if (!proxyServer) {
         throw new Error('VITE_PROXY_SERVER no está configurado')
       }
 
-      // 2. Llamar al endpoint del proxy
       const response = await fetch(`${proxyServer}/api/motivBotLinkIssuesFromGithub`, {
         method: 'POST',
         headers: {
@@ -39,7 +37,6 @@ export const useGitHubIssuesSync = () => {
         throw new Error(data.message || 'Error en la sincronización')
       }
 
-      // 3. Guardar resultado
       lastSyncResult.value = data.data
 
       console.log('✅ Sincronización completada:', {
@@ -66,7 +63,7 @@ export const useGitHubIssuesSync = () => {
     error,
     lastSyncResult,
 
-    // Método principal
+    // Métodos
     syncGitHubIssues
   }
 }
