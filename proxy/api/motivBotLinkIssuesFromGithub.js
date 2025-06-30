@@ -95,25 +95,120 @@ export default async function handler(req, res) {
     try {
       console.log(`🔍 Fetching repositories for user: ${githubUsername}...`);
 
-      // Paso 3.1: Obtener todos los repositorios del usuario
-      const reposResponse = await fetch(`https://api.github.com/users/${githubUsername}/repos?per_page=100&sort=updated&direction=desc`, {
-        headers: {
-          'Authorization': `token ${githubToken}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'motivBot-LinkIssues'
-        }
-      });
+      // Paso 3.1: Obtener TODOS los repositorios del usuario con paginación
+      let allRepositories = [];
+      let page = 1;
+      const perPage = 100; // Máximo permitido por GitHub
 
-      if (!reposResponse.ok) {
-        console.error(`❌ Failed to fetch repositories: ${reposResponse.status}`);
-        return res.status(500).json({
-          error: 'GitHub API error',
-          message: `Failed to fetch repositories from GitHub: ${reposResponse.status}`
-        });
+      while (true) {
+        console.log(`📄 Fetching page ${page} of repositories...`);
+
+        const reposResponse = await fetch(
+          `https://api.github.com/users/${githubUsername}/repos?per_page=${perPage}&page=${page}&sort=updated&direction=desc&type=all`,
+          {
+            headers: {
+              'Authorization': `token ${githubToken}`,
+              'Accept': 'application/vnd.github.v3+json',
+              'User-Agent': 'motivBot-LinkIssues'
+            }
+          }
+        );
+
+        if (!reposResponse.ok) {
+          console.error(`❌ Failed to fetch repositories page ${page}: ${reposResponse.status}`);
+
+          // Si es la primera página, es un error crítico
+          if (page === 1) {
+            return res.status(500).json({
+              error: 'GitHub API error',
+              message: `Failed to fetch repositories from GitHub: ${reposResponse.status}. Check your GITHUB_TOKEN permissions.`
+            });
+          }
+
+          // Si no es la primera página, puede que hayamos llegado al final
+          break;
+        }
+
+        const pageRepositories = await reposResponse.json();
+
+        // Si no hay más repositorios, salir del bucle
+        if (!pageRepositories || pageRepositories.length === 0) {
+          console.log(`📄 No more repositories found on page ${page}`);
+          break;
+        }
+
+        console.log(`📁 Found ${pageRepositories.length} repositories on page ${page}`);
+        allRepositories.push(...pageRepositories);
+
+        // Si recibimos menos repositorios que el máximo, es la última página
+        if (pageRepositories.length < perPage) {
+          console.log(`📄 Last page reached (${pageRepositories.length} < ${perPage})`);
+          break;
+        }
+
+        page++;
       }
 
-      const repositories = await reposResponse.json();
-      console.log(`📁 Found ${repositories.length} repositories for ${githubUsername}`);
+      console.log(`📁 Total repositories found: ${allRepositories.length} for ${githubUsername}`);
+
+      // También intentar obtener repos donde el usuario es colaborador
+      try {
+        console.log(`🤝 Fetching repositories where ${githubUsername} is a collaborator...`);
+
+        const collaboratorReposResponse = await fetch(
+          `https://api.github.com/user/repos?per_page=100&affiliation=collaborator`,
+          {
+            headers: {
+              'Authorization': `token ${githubToken}`,
+              'Accept': 'application/vnd.github.v3+json',
+              'User-Agent': 'motivBot-LinkIssues'
+            }
+          }
+        );
+
+        if (collaboratorReposResponse.ok) {
+          const collaboratorRepos = await collaboratorReposResponse.json();
+          console.log(`🤝 Found ${collaboratorRepos.length} collaborator repositories`);
+
+          // Evitar duplicados comparando por ID
+          const existingIds = new Set(allRepositories.map(repo => repo.id));
+          const newCollaboratorRepos = collaboratorRepos.filter(repo => !existingIds.has(repo.id));
+
+          if (newCollaboratorRepos.length > 0) {
+            console.log(`➕ Adding ${newCollaboratorRepos.length} new collaborator repositories`);
+            allRepositories.push(...newCollaboratorRepos);
+          }
+        } else {
+          console.log(`⚠️ Could not fetch collaborator repos: ${collaboratorReposResponse.status}`);
+        }
+      } catch (collabError) {
+        console.log(`⚠️ Error fetching collaborator repos:`, collabError.message);
+      }
+
+      const repositories = allRepositories;
+      console.log(`📁 Final repository count: ${repositories.length} repositories for processing`);
+
+      if (repositories.length === 0) {
+        return res.status(200).json({
+          success: true,
+          message: 'No repositories found for the user',
+          data: {
+            github_username: githubUsername,
+            total_repositories: 0,
+            processed_repositories: 0,
+            repositories_with_issues: 0,
+            total_issues_found: 0,
+            new_tasks_created: 0,
+            existing_tasks_found: 0,
+            processing_summary: {
+              repositories_processed: [],
+              new_tasks_by_repo: [],
+              repositories_without_issues: []
+            },
+            issues_summary: []
+          }
+        });
+      }
 
       let totalNewTasks = 0;
       let totalExistingTasks = 0;
@@ -121,30 +216,51 @@ export default async function handler(req, res) {
       let repositoriesProcessed = [];
 
       // Paso 3.2: Iterar por cada repositorio
-      for (const repo of repositories) {
+      for (const [index, repo] of repositories.entries()) {
         try {
-          console.log(`🔍 Processing repository: ${repo.full_name}...`);
+          console.log(`🔍 Processing repository ${index + 1}/${repositories.length}: ${repo.full_name}...`);
 
-          // Obtener issues del repositorio (abiertos y cerrados)
-          const issuesResponse = await fetch(`https://api.github.com/repos/${repo.full_name}/issues?state=all&per_page=100`, {
-            headers: {
-              'Authorization': `token ${githubToken}`,
-              'Accept': 'application/vnd.github.v3+json',
-              'User-Agent': 'motivBot-LinkIssues'
+          // Obtener issues del repositorio (abiertos y cerrados) con paginación
+          let allIssues = [];
+          let issuePage = 1;
+          const issuesPerPage = 100;
+
+          while (true) {
+            const issuesResponse = await fetch(
+              `https://api.github.com/repos/${repo.full_name}/issues?state=all&per_page=${issuesPerPage}&page=${issuePage}`,
+              {
+                headers: {
+                  'Authorization': `token ${githubToken}`,
+                  'Accept': 'application/vnd.github.v3+json',
+                  'User-Agent': 'motivBot-LinkIssues'
+                }
+              }
+            );
+
+            if (!issuesResponse.ok) {
+              console.error(`❌ Failed to fetch issues from ${repo.full_name}: ${issuesResponse.status}`);
+              break;
             }
-          });
 
-          if (!issuesResponse.ok) {
-            console.error(`❌ Failed to fetch issues from ${repo.full_name}: ${issuesResponse.status}`);
-            continue;
+            const pageIssues = await issuesResponse.json();
+
+            if (!pageIssues || pageIssues.length === 0) {
+              break;
+            }
+
+            allIssues.push(...pageIssues);
+
+            if (pageIssues.length < issuesPerPage) {
+              break;
+            }
+
+            issuePage++;
           }
 
-          const repoIssues = await issuesResponse.json();
-
           // Filtrar solo issues (no pull requests)
-          const filteredIssues = repoIssues.filter(issue => !issue.pull_request);
+          const filteredIssues = allIssues.filter(issue => !issue.pull_request);
 
-          console.log(`📝 Found ${filteredIssues.length} issues in ${repo.full_name}`);
+          console.log(`📝 Found ${filteredIssues.length} issues in ${repo.full_name} (${allIssues.length} total items, ${allIssues.length - filteredIssues.length} pull requests filtered out)`);
 
           if (filteredIssues.length === 0) {
             console.log(`⏭️  No issues found in ${repo.full_name}, skipping...`);

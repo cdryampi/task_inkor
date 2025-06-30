@@ -24,6 +24,9 @@
             <p class="text-sm text-gray-600">
               Convierte tus issues de GitHub en tareas automáticamente
             </p>
+            <small class="text-xs text-gray-500 mt-1">
+              <span class="font-medium">Nota:</span> Esta función puede tardar un poco dependiendo de la cantidad de repositorios y issues.
+            </small>
           </div>
         </div>
 
