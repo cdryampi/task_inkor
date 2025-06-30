@@ -274,24 +274,19 @@ export default async function handler(req, res) {
           // Paso 3.3: Procesar cada issue del repositorio
           for (const issue of filteredIssues) {
             // Verificar si ya existe una tarea para este issue
+            // ✅ Simplificar detección de duplicados
             const existingTask = tasks.find(task => {
-              // Prioridad 1: Por ID de GitHub issue
-              if (task.github_issue_id === issue.id) {
+              // Buscar por título que contenga el patrón [repo] título
+              const taskTitle = task.title?.toLowerCase() || '';
+              const searchPattern = `[${repo.name.toLowerCase()}] ${issue.title.toLowerCase()}`;
+
+              if (taskTitle === searchPattern) {
                 return true;
               }
 
-              // Prioridad 2: Por título y repo
-              if (task.title?.includes(issue.title) && task.github_repo === repo.full_name) {
+              // Buscar en la descripción si contiene el GitHub ID
+              if (task.description?.includes(`🆔 **GitHub ID:** ${issue.id}`)) {
                 return true;
-              }
-
-              // Prioridad 3: Verificación por tags array
-              if (Array.isArray(task.tags) && task.tags.includes('motivBotLinkIssuesFromGithub')) {
-                const taskTitle = task.title?.toLowerCase() || '';
-                const issueTitle = issue.title?.toLowerCase() || '';
-                if (taskTitle.includes(issueTitle) || issueTitle.includes(taskTitle.replace(/^\[.*?\]\s*/, ''))) {
-                  return true;
-                }
               }
 
               return false;
@@ -316,17 +311,22 @@ export default async function handler(req, res) {
               // Crear nueva tarea - cambiar tags a array
               const newTask = {
                 title: `[${repo.name}] ${issue.title}`,
-                description: `${issue.body || 'No description provided'}\n\n🔗 **GitHub Issue:** ${issue.html_url}\n📁 **Repository:** ${repo.full_name}\n🏷️ **Labels:** ${issue.labels?.map(l => l.name).join(', ') || 'None'}\n👤 **Created by:** ${issue.user?.login || 'Unknown'}`,
-                tags: ['motivBotLinkIssuesFromGithub'], // ✅ Cambiar a array
+                description: `${issue.body || 'No description provided'}
+
+🔗 **GitHub Issue:** ${issue.html_url}
+📁 **Repository:** ${repo.full_name}
+🔢 **Issue #:** ${issue.number}
+🏷️ **Labels:** ${issue.labels?.map(l => l.name).join(', ') || 'None'}
+👤 **Created by:** ${issue.user?.login || 'Unknown'}
+📊 **State:** ${issue.state}
+🆔 **GitHub ID:** ${issue.id}
+
+---
+*Sincronizado automáticamente desde GitHub*`,
+                tags: ['motivBotLinkIssuesFromGithub'],
                 status: issue.state === 'open' ? 'pending' : 'completed',
-                priority: priority,
-                github_issue_id: issue.id,
-                github_issue_number: issue.number,
-                github_repo: repo.full_name,
-                github_issue_url: issue.html_url,
-                github_issue_state: issue.state,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
+                priority: priority
+                // ✅ Removidas todas las columnas github_*
               };
 
               try {
