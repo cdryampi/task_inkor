@@ -159,19 +159,18 @@ export default async function handler(req, res) {
           for (const issue of filteredIssues) {
             // Verificar si ya existe una tarea para este issue
             const existingTask = tasks.find(task => {
-              // Buscar por github_issue_id (más confiable)
+              // Prioridad 1: Por ID de GitHub issue
               if (task.github_issue_id === issue.id) {
                 return true;
               }
 
-              // Fallback: buscar por título y repo
+              // Prioridad 2: Por título y repo
               if (task.title?.includes(issue.title) && task.github_repo === repo.full_name) {
                 return true;
               }
 
-              // Fallback adicional: si tags es array, verificar que contenga el tag especial
+              // Prioridad 3: Verificación por tags array
               if (Array.isArray(task.tags) && task.tags.includes('motivBotLinkIssuesFromGithub')) {
-                // Verificar similaridad en el título
                 const taskTitle = task.title?.toLowerCase() || '';
                 const issueTitle = issue.title?.toLowerCase() || '';
                 if (taskTitle.includes(issueTitle) || issueTitle.includes(taskTitle.replace(/^\[.*?\]\s*/, ''))) {
