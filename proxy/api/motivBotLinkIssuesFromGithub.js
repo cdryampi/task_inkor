@@ -66,10 +66,11 @@ export default async function handler(req, res) {
     let tasks = [];
     // paso 2: obtener las tareas con tag "motivBotLinkIssuesFromGithub"
     try {
+      // Cambiar la consulta para buscar en arrays
       const { data, error } = await supabase
         .from('task')
         .select('*')
-        .eq('tags', 'motivBotLinkIssuesFromGithub');
+        .contains('tags', ['motivBotLinkIssuesFromGithub']);
 
       if (error) {
         console.error('Error fetching tasks:', error);
@@ -157,10 +158,29 @@ export default async function handler(req, res) {
           // Paso 3.3: Procesar cada issue del repositorio
           for (const issue of filteredIssues) {
             // Verificar si ya existe una tarea para este issue
-            const existingTask = tasks.find(task =>
-              task.github_issue_id === issue.id ||
-              (task.title?.includes(issue.title) && task.github_repo === repo.full_name)
-            );
+            const existingTask = tasks.find(task => {
+              // Buscar por github_issue_id (más confiable)
+              if (task.github_issue_id === issue.id) {
+                return true;
+              }
+
+              // Fallback: buscar por título y repo
+              if (task.title?.includes(issue.title) && task.github_repo === repo.full_name) {
+                return true;
+              }
+
+              // Fallback adicional: si tags es array, verificar que contenga el tag especial
+              if (Array.isArray(task.tags) && task.tags.includes('motivBotLinkIssuesFromGithub')) {
+                // Verificar similaridad en el título
+                const taskTitle = task.title?.toLowerCase() || '';
+                const issueTitle = issue.title?.toLowerCase() || '';
+                if (taskTitle.includes(issueTitle) || issueTitle.includes(taskTitle.replace(/^\[.*?\]\s*/, ''))) {
+                  return true;
+                }
+              }
+
+              return false;
+            });
 
             if (!existingTask) {
               // Determinar prioridad basada en labels
@@ -178,11 +198,11 @@ export default async function handler(req, res) {
                 priority = 'low';
               }
 
-              // Crear nueva tarea
+              // Crear nueva tarea - cambiar tags a array
               const newTask = {
                 title: `[${repo.name}] ${issue.title}`,
                 description: `${issue.body || 'No description provided'}\n\n🔗 **GitHub Issue:** ${issue.html_url}\n📁 **Repository:** ${repo.full_name}\n🏷️ **Labels:** ${issue.labels?.map(l => l.name).join(', ') || 'None'}\n👤 **Created by:** ${issue.user?.login || 'Unknown'}`,
-                tags: 'motivBotLinkIssuesFromGithub',
+                tags: ['motivBotLinkIssuesFromGithub'], // ✅ Cambiar a array
                 status: issue.state === 'open' ? 'pending' : 'completed',
                 priority: priority,
                 github_issue_id: issue.id,
