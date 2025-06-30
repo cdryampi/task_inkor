@@ -44,6 +44,10 @@
         {
             "source": "api/motivBotMessageOpenAI",
             "destination": "/api/motivBotMessageOpenAI.js"
+        },
+        {
+            "source": "api/motivBotLinkIssuesFromGithub",
+            "destination": "/api/motivBotLinkIssuesFromGithub.js"
         }
     ],
     "headers": [

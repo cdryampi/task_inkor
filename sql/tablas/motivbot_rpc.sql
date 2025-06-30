@@ -862,6 +862,12 @@ BEGIN
             EXECUTE update_query USING p_task_id, trim(p_title);
         ELSIF p_status IS NOT NULL THEN
             EXECUTE update_query USING p_task_id, p_status;
+        ELSIF p_due_date IS NOT NULL AND p_due_time IS NOT NULL THEN
+            EXECUTE update_query USING p_task_id, p_due_date, p_due_time;
+        ELSIF p_due_date IS NOT NULL THEN
+            EXECUTE update_query USING p_task_id, p_due_date;
+        ELSIF p_due_time IS NOT NULL THEN
+            EXECUTE update_query USING p_task_id, p_due_time;
         ELSE
             -- Fallback genérico para otros casos
             EXECUTE format('UPDATE public.task SET %s WHERE id = %s', 

@@ -71,17 +71,27 @@ export default async function handler(req, res) {
     }
 
     // 2. Check if task already has tags
-    if (taskData.tags && Array.isArray(taskData.tags) && taskData.tags.length > 0) {
-      console.log(`✅ Task ${task_id} already has tags:`, taskData.tags);
-      return res.status(200).json({
-        success: true,
-        message: 'Task already has tags',
-        data: {
-          task_id: task_id,
-          existing_tags: taskData.tags,
-          updated: false
-        }
-      });
+    if (taskData.tags && taskData.tags.length > 0) {
+      // Si es string, convertir a array para manejar ambos casos
+      const tagsArray = Array.isArray(taskData.tags) ? taskData.tags : [taskData.tags];
+
+      // If task has only the "motivBotLinkIssuesFromGithub" tag, we need to generate additional tags
+      if (tagsArray.length === 1 && tagsArray[0] === 'motivBotLinkIssuesFromGithub') {
+        console.log(`🔄 Task ${task_id} only has the "motivBotLinkIssuesFromGithub" tag, proceeding with tag generation...`);
+        // Continue with tag generation - don't return here
+      } else {
+        // Task already has multiple tags or different tags
+        console.log(`✅ Task ${task_id} already has meaningful tags:`, tagsArray);
+        return res.status(200).json({
+          success: true,
+          message: 'Task already has tags',
+          data: {
+            task_id: task_id,
+            existing_tags: tagsArray,
+            updated: false
+          }
+        });
+      }
     }
 
     console.log(`🤖 Generating tags for task: "${taskData.title}"`);
@@ -218,10 +228,20 @@ Título: "${taskData.title}"`;
 
     console.log(`🏷️ Generated tags for task ${task_id}:`, generatedTags);
 
-    // 7. Update task with generated tags
+    // 7. Update task with generated tags (preservando el tag original si existe)
+    let finalTags = generatedTags;
+
+    // Si la tarea tenía "motivBotLinkIssuesFromGithub", mantenerlo junto con los nuevos
+    if (taskData.tags) {
+      const existingTags = Array.isArray(taskData.tags) ? taskData.tags : [taskData.tags];
+      if (existingTags.includes('motivBotLinkIssuesFromGithub')) {
+        finalTags = ['motivBotLinkIssuesFromGithub', ...generatedTags.filter(tag => tag !== 'motivBotLinkIssuesFromGithub')];
+      }
+    }
+
     const { data: updatedTask, error: updateError } = await supabase
       .from('task')
-      .update({ tags: generatedTags })
+      .update({ tags: finalTags })
       .eq('id', task_id)
       .select('*')
       .maybeSingle();
