@@ -74,8 +74,7 @@
   </div>
 </template>
 
-<script>
-import { useRouter } from 'vue-router'
+<script setup>
 import {
   PencilIcon,
   TrashIcon,
@@ -92,162 +91,35 @@ import {
   FireIcon as FireIconSolid
 } from '@heroicons/vue/24/solid'
 import NewTaskModal from '@/components/modals/NewTaskModal.vue'
+import { useTaskCard } from '@/composables/useTaskCard'
 
-export default {
-  name: 'TaskCard',
-  components: {
-    PencilIcon,
-    TrashIcon,
-    CalendarDaysIcon,
-    ClipboardDocumentListIcon,
-    TagIcon,
-    MinusIcon,
-    ClockIcon,
-    EyeIcon,
-    ArrowTopRightOnSquareIcon,
-    ExclamationTriangleIconSolid,
-    FireIconSolid,
-    NewTaskModal
-  },
-  props: {
-    task: {
-      type: Object,
-      required: true
-    }
-  },
-  data() {
-    return {
-      isEditModalOpen: false,
-      updatingTask: false,
-      // ✅ VALOR LOCAL PARA EL STATUS
-      localStatus: this.task.status
-    }
-  },
-  setup() {
-    const router = useRouter()
-    return { router }
-  },
-  computed: {
-    taskStatusClass() {
-      // ✅ USAR EL STATUS LOCAL PARA LA CLASE CSS
-      return `status-${this.localStatus}`;
-    }
-  },
-  // ✅ WATCH PARA SINCRONIZAR CON LA PROP CUANDO CAMBIE DESDE EL PADRE
-  watch: {
-    'task.status': {
-      handler(newStatus) {
-        console.log('🔄 TaskCard - Status de prop cambió:', newStatus)
-        this.localStatus = newStatus
-      },
-      immediate: true
-    }
-  },
-  methods: {
-    // ✅ ABRIR MODAL DE EDICIÓN
-    openEditModal() {
-      console.log('✏️ TaskCard - Abriendo modal de edición:', this.task.id)
-      this.isEditModalOpen = true
-    },
-
-    // ✅ CERRAR MODAL DE EDICIÓN
-    closeEditModal() {
-      console.log('❌ TaskCard - Cerrando modal de edición')
-      this.isEditModalOpen = false
-    },
-
-    // ✅ FORMATEAR TAREA PARA EL MODAL
-    formatTaskForModal(task) {
-      if (!task) return null
-      return {
-        id: task.id,
-        title: task.title,
-        description: task.description,
-        status: task.status,
-        priority: task.priority || 'normal',
-        dueDate: task.dueDate,
-        dueTime: task.dueTime
-      }
-    },
-
-    // ✅ MANEJAR ACTUALIZACIÓN DE TAREA DESDE MODAL
-    async handleUpdateTask(taskData) {
-      this.updatingTask = true
-      try {
-        console.log('🔄 TaskCard - Actualizando tarea:', taskData)
-
-        // Emitir evento al TaskContainer
-        this.$emit('update-task', taskData)
-
-        // Cerrar modal
-        this.closeEditModal()
-
-        console.log('✅ TaskCard - Tarea actualizada exitosamente')
-      } catch (err) {
-        console.error('❌ TaskCard - Error actualizando tarea:', err)
-      } finally {
-        this.updatingTask = false
-      }
-    },
-
-    // ✅ NAVEGAR AL DETALLE
-    viewTask() {
-      console.log('👁️ TaskCard - Navegando a detalle de tarea:', this.task.id)
-      this.router.push(`/task/${this.task.id}`)
-    },
-
-    // ✅ ELIMINAR TAREA
-    deleteTask() {
-      console.log('🗑️ TaskCard - Emitiendo delete-task:', this.task.id)
-      this.$emit('delete-task', this.task.id);
-    },
-
-    // ✅ ACTUALIZAR ESTADO - MEJORADO
-    updateStatus() {
-      console.log('🔄 TaskCard - Emitiendo update-status:', this.task.id, this.localStatus)
-      console.log('📊 TaskCard - Status anterior:', this.task.status, '-> Nuevo:', this.localStatus)
-
-      // Emitir al padre con el nuevo status
-      this.$emit('update-status', this.task.id, this.localStatus);
-    },
-
-    // ✅ MÉTODOS DE UTILIDAD
-    formatDate(date) {
-      return new Date(date).toLocaleDateString('es-ES');
-    },
-    formatTime(timeStr) {
-      if (!timeStr) return ''
-      return new Date(`2000-01-01T${timeStr}`).toLocaleTimeString('es-ES', {
-        hour: '2-digit',
-        minute: '2-digit'
-      })
-    },
-    getPriorityClass(priority) {
-      switch (priority) {
-        case 'high':
-          return 'bg-gradient-to-r from-red-100 to-red-200 text-red-800 border border-red-300 shadow-sm'
-        case 'medium':
-          return 'bg-gradient-to-r from-yellow-100 to-yellow-200 text-yellow-800 border border-yellow-300 shadow-sm'
-        default:
-          return 'bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 border border-gray-300'
-      }
-    },
-    getPriorityIcon(priority) {
-      switch (priority) {
-        case 'high': return 'FireIconSolid'
-        case 'medium': return 'ExclamationTriangleIconSolid'
-        default: return 'MinusIcon'
-      }
-    },
-    getPriorityLabel(priority) {
-      switch (priority) {
-        case 'high': return 'Urgente'
-        case 'medium': return 'Media'
-        default: return 'Normal'
-      }
-    }
+const props = defineProps({
+  task: {
+    type: Object,
+    required: true
   }
-}
+})
+
+const emit = defineEmits(['update-task', 'delete-task', 'update-status'])
+
+const {
+  isEditModalOpen,
+  updatingTask,
+  localStatus,
+  taskStatusClass,
+  openEditModal,
+  closeEditModal,
+  formatTaskForModal,
+  handleUpdateTask,
+  viewTask,
+  deleteTask,
+  updateStatus,
+  formatDate,
+  formatTime,
+  getPriorityClass,
+  getPriorityIcon,
+  getPriorityLabel
+} = useTaskCard(props, emit)
 </script>
 
 <style scoped>
