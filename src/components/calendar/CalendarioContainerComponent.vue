@@ -49,9 +49,10 @@
         @dayclick="handleVCalendarDayClick"
         @update:page="handlePageChange">
 
-        <!-- ✅ SLOT CON EVENTOS PERSONALIZADOS -->
+        <!-- ✅ SLOT CON EVENTOS PERSONALIZADOS Y VALIDACIÓN -->
         <template #day-content="{ day }">
           <CalendarDay
+            v-if="day && day.id"
             :day="day"
             :all-tasks="getTasksForDay(day)"
             :display-tasks="getDisplayTasksForDay(day)"
@@ -61,6 +62,10 @@
             @day-click="handleDaySelection"
             @filter-by-day="handleFilterByDay"
           />
+          <!-- ✅ Fallback para días inválidos -->
+          <div v-else class="p-2 text-gray-400 text-sm">
+            Día no disponible
+          </div>
         </template>
       </VCalendar>
     </div>
@@ -113,6 +118,8 @@ import { useSupabase } from '@/hooks/supabase'
 import { useNewTaskModal } from '@/composables/useNewTaskModal'
 import { useCalendarFilters } from '@/composables/useCalendarFilters'
 import { push } from 'notivue'
+import { ChevronUpIcon, FunnelIcon, MinusIcon } from '@heroicons/vue/24/outline'
+import { ExclamationTriangleIcon as ExclamationTriangleIconSolid, FireIcon as FireIconSolid } from '@heroicons/vue/24/solid'
 
 // Componentes
 import CalendarHeader from './CalendarHeader.vue'
@@ -244,42 +251,51 @@ const calendarAttributes = computed(() => {
   return attributes
 })
 
-// ✅ COMPUTADA MEJORADA PARA TAREAS DEL DÍA SELECCIONADO
-const selectedDayTasks = computed(() => {
-  if (!selectedDate.value) return []
-
-  const dateStr = selectedDate.value.id.split('T')[0]
-
-  // Si hay filtro por día activo y coincide con el día seleccionado, mostrar las tareas filtradas
-  if (dayFilterActive.value && filteredByDate.value === dateStr) {
-    return tasks.value.filter(task =>
-      task.due_date && task.due_date.split('T')[0] === dateStr
-    ).sort(sortTasksByPriority)
-  }
-
-  // Si no hay filtro por día, mostrar todas las tareas del día
-  return getTasksForDay(selectedDate.value).sort(sortTasksByPriority)
-})
-
-// Función auxiliar para ordenar tareas
-const sortTasksByPriority = (a, b) => {
-  if (a.status !== b.status) {
-    return a.status === 'pending' ? -1 : 1
-  }
-  const priorityOrder = { high: 3, medium: 2, normal: 1 }
-  return (priorityOrder[b.priority] || 1) - (priorityOrder[a.priority] || 1)
-}
-
 // Métodos
 const getTasksForDay = (day) => {
-  const dateStr = day.id.split('T')[0]
+  // ✅ VALIDACIÓN MEJORADA PARA EVITAR ERRORES
+  if (!day || !day.id) {
+    console.warn('⚠️ getTasksForDay: día inválido:', day)
+    return []
+  }
+
+  let dateStr
+  try {
+    // ✅ Manejo más robusto de la fecha
+    if (day.id.includes('T')) {
+      dateStr = day.id.split('T')[0]
+    } else {
+      // Si no tiene formato ISO, intentar con la fecha del objeto day
+      dateStr = day.date ? day.date.toISOString().split('T')[0] : day.id
+    }
+  } catch (error) {
+    console.error('❌ Error procesando fecha del día:', error, day)
+    return []
+  }
+
   return allTasksRef.value.filter(task =>
     task.due_date && task.due_date.split('T')[0] === dateStr
   )
 }
 
 const getDisplayTasksForDay = (day) => {
-  const dateStr = day.id.split('T')[0]
+  // ✅ VALIDACIÓN TEMPRANA
+  if (!day || !day.id) {
+    console.warn('⚠️ getDisplayTasksForDay: día inválido:', day)
+    return []
+  }
+
+  let dateStr
+  try {
+    if (day.id.includes('T')) {
+      dateStr = day.id.split('T')[0]
+    } else {
+      dateStr = day.date ? day.date.toISOString().split('T')[0] : day.id
+    }
+  } catch (error) {
+    console.error('❌ Error procesando fecha para display:', error, day)
+    return []
+  }
 
   // Si hay filtro por día activo y coincide con este día, mostrar tareas filtradas
   if (dayFilterActive.value && filteredByDate.value === dateStr) {
@@ -292,28 +308,106 @@ const getDisplayTasksForDay = (day) => {
   return getTasksForDay(day)
 }
 
+// ✅ FUNCIÓN AUXILIAR PARA VALIDAR Y NORMALIZAR DÍAS
+const validateDay = (day) => {
+  if (!day) return null
+
+  // Si no tiene id, intentar crearlo
+  if (!day.id && day.date) {
+    return {
+      ...day,
+      id: day.date.toISOString()
+    }
+  }
+
+  return day
+}
+
 const isSelectedDay = (day) => {
-  if (!selectedDate.value) return false
+  if (!selectedDate.value || !day || !day.id) return false
   return day.id === selectedDate.value.id
 }
 
 const isToday = (day) => {
+  if (!day || !day.date) return false
   const today = new Date()
   return day.date.toDateString() === today.toDateString()
 }
 
-// ✅ MANEJO PRINCIPAL DEL EVENTO DE VCALENDAR
+// ✅ FUNCIÓN PARA ORDENAR TAREAS POR PRIORIDAD
+const sortTasksByPriority = (tasks) => {
+  const priorityOrder = { 'high': 3, 'medium': 2, 'low': 1 }
+
+  return [...tasks].sort((a, b) => {
+    // Primero por prioridad (descendente)
+    const priorityDiff = (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0)
+    if (priorityDiff !== 0) return priorityDiff
+
+    // Luego por estado (pendientes primero)
+    if (a.status !== b.status) {
+      return a.status === 'pending' ? -1 : 1
+    }
+
+    // Finalmente por fecha de creación (más recientes primero)
+    return new Date(b.created_at) - new Date(a.created_at)
+  })
+}
+
+// ✅ COMPUTADA MEJORADA PARA TAREAS DEL DÍA SELECCIONADO
+const selectedDayTasks = computed(() => {
+  if (!selectedDate.value) return []
+
+  // ✅ Validar que selectedDate tenga los datos necesarios
+  const validatedDay = validateDay(selectedDate.value)
+  if (!validatedDay) return []
+
+  let dateStr
+  try {
+    if (validatedDay.id.includes('T')) {
+      dateStr = validatedDay.id.split('T')[0]
+    } else {
+      dateStr = validatedDay.date ? validatedDay.date.toISOString().split('T')[0] : validatedDay.id
+    }
+  } catch (error) {
+    console.error('❌ Error en selectedDayTasks:', error)
+    return []
+  }
+
+  let dayTasks = []
+
+  // Si hay filtro por día activo y coincide con el día seleccionado, mostrar las tareas filtradas
+  if (dayFilterActive.value && filteredByDate.value === dateStr) {
+    dayTasks = tasks.value.filter(task =>
+      task.due_date && task.due_date.split('T')[0] === dateStr
+    )
+  } else {
+    // Si no hay filtro por día, mostrar todas las tareas del día
+    dayTasks = getTasksForDay(validatedDay)
+  }
+
+  // ✅ Ordenar las tareas por prioridad
+  return sortTasksByPriority(dayTasks)
+})
+
+// ✅ MANEJO PRINCIPAL DEL EVENTO DE VCALENDAR MEJORADO
 const handleVCalendarDayClick = async (day) => {
-  console.log('📅 VCalendar - Día clickeado:', day.id)
+  console.log('📅 VCalendar - Día clickeado:', day)
+
+  // ✅ Validar el día antes de procesar
+  const validatedDay = validateDay(day)
+  if (!validatedDay) {
+    console.error('❌ Día inválido recibido:', day)
+    return
+  }
 
   // Seleccionar el día
-  selectedDate.value = day
+  selectedDate.value = validatedDay
 
   // Si el día tiene tareas, aplicar filtro
-  const dayTasks = getTasksForDay(day)
+  const dayTasks = getTasksForDay(validatedDay)
   if (dayTasks.length > 0) {
     console.log('🔍 Aplicando filtro por día con', dayTasks.length, 'tareas')
-    await handleFilterByDay(day)
+    await handleFilterByDay(validatedDay)
   } else {
     console.log('📅 Día sin tareas, solo seleccionado')
     // Si no hay filtro activo y no hay tareas, limpiar cualquier filtro previo

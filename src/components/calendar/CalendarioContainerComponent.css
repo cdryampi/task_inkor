@@ -5,10 +5,31 @@
   --vc-nav-arrow-color: var(--color-primary-600);
 }
 
+/* ✅ CORREGIR Y MEJORAR EL GRID DEL CALENDARIO */
+:deep(.vc-week),
+:deep(.vc-weekdays) {
+  display: grid !important;
+  grid-template-columns: repeat(7, 1fr) !important;
+  position: relative;
+  width: 100%;
+  gap: 1px;
+}
+
+/* ✅ ASEGURAR QUE CADA DÍA TENGA EL ANCHO CORRECTO */
+:deep(.vc-weekday),
+:deep(.vc-day) {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 :deep(.vc-day) {
   border: 1px solid var(--color-gray-200);
   min-height: 100px;
   transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  position: relative;
 }
 
 :deep(.vc-day:hover) {
@@ -24,8 +45,47 @@
   box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
 }
 
+/* ✅ MEJORAR LA VISUALIZACIÓN DE LOS NÚMEROS DE DÍA */
+:deep(.vc-day-content) {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ✅ ASEGURAR QUE EL NÚMERO DEL DÍA SEA VISIBLE */
+:deep(.vc-day-label) {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--color-gray-900);
+  z-index: 1;
+}
+
+/* ✅ ESTILO PARA DÍAS DEL MES ANTERIOR/SIGUIENTE */
+:deep(.vc-day.is-not-in-month .vc-day-label) {
+  color: var(--color-gray-400);
+}
+
+/* ✅ ESTILO PARA EL DÍA ACTUAL */
+:deep(.vc-day.is-today .vc-day-label) {
+  background-color: var(--color-primary-600);
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+}
+
 :deep(.vc-container) {
   border: none !important;
+  width: 100%;
 }
 
 :deep(.vc-header) {
@@ -55,6 +115,7 @@
 
 :deep(.vc-weeks) {
   padding: 0;
+  width: 100%;
 }
 
 :deep(.vc-weekday) {
@@ -62,4 +123,40 @@
   font-weight: 600;
   padding: 0.75rem 0;
   background-color: var(--color-gray-200);
+  text-align: center;
+  border: 1px solid var(--color-gray-300);
+}
+
+/* ✅ ASEGURAR QUE LOS DESTACADOS FUNCIONEN CORRECTAMENTE */
+:deep(.vc-highlight) {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  border-radius: 0;
+}
+
+/* ✅ RESPONSIVE PARA PANTALLAS PEQUEÑAS */
+@media (max-width: 768px) {
+  :deep(.vc-day) {
+    min-height: 80px;
+  }
+
+  :deep(.vc-day-label) {
+    font-size: 0.75rem;
+  }
+
+  :deep(.vc-weekday) {
+    padding: 0.5rem 0;
+    font-size: 0.875rem;
+  }
+}
+
+/* ✅ ASEGURAR QUE EL CONTENIDO PERSONALIZADO SEA VISIBLE */
+:deep(.vc-day-content > div) {
+  width: 100%;
+  height: 100%;
+  position: relative;
 }
