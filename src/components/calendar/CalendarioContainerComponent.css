@@ -1,0 +1,65 @@
+.custom-calendar {
+  --vc-color-primary: var(--color-primary-500);
+  --vc-color-primary-light: var(--color-primary-100);
+  --vc-weekday-color: var(--color-gray-600);
+  --vc-nav-arrow-color: var(--color-primary-600);
+}
+
+:deep(.vc-day) {
+  border: 1px solid var(--color-gray-200);
+  min-height: 100px;
+  transition: all 0.2s ease;
+}
+
+:deep(.vc-day:hover) {
+  background-color: var(--color-primary-50);
+  border-color: var(--color-primary-500);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.1);
+}
+
+:deep(.vc-day.selected) {
+  background-color: var(--color-primary-100);
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+:deep(.vc-container) {
+  border: none !important;
+}
+
+:deep(.vc-header) {
+  padding: 2.5rem;
+  margin-top: 0 !important;
+}
+
+:deep(.vc-title) {
+  color: var(--color-primary-600) !important;
+  font-weight: 700;
+  font-size: 1.5rem;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+:deep(.vc-nav-arrow) {
+  color: var(--color-primary-600);
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  transition: all 0.2s;
+}
+
+:deep(.vc-nav-arrow:hover) {
+  background-color: var(--color-primary-200);
+  transform: scale(1.1);
+}
+
+:deep(.vc-weeks) {
+  padding: 0;
+}
+
+:deep(.vc-weekday) {
+  color: var(--color-gray-600);
+  font-weight: 600;
+  padding: 0.75rem 0;
+  background-color: var(--color-gray-200);
+}
