@@ -637,6 +637,34 @@ export const useSupabase = () => {
       loading.value = false
     }
   }
+  // Función para obtener un mensaje aleatorio según el estado emocional para motivBot modo Waifu
+  const getRandomMessageByEmotion = async (emotion) => {
+    try {
+      loading.value = true
+      error.value = null
+
+      console.log(`🎲 Obteniendo mensaje aleatorio para emoción: ${emotion}`)
+
+      const { data, error: rpcError } = await supabase
+        .rpc('get_random_chibi_messages_by_emotion', { emotion })
+
+      if (rpcError) {
+        console.error('❌ Error calling RPC:', rpcError)
+        error.value = rpcError
+        return null
+      }
+
+      console.log(`✅ Mensaje obtenido: ${data?.length || 0}`)
+      return data || null
+
+    } catch (err) {
+      console.error('💥 Error in getRandomMessageByEmotion:', err)
+      error.value = err
+      return null
+    } finally {
+      loading.value = false
+    }
+  }
 
   // ✅ Función auxiliar para productividad semanal
   const getWeeklyProductivity = () => {
@@ -728,6 +756,7 @@ export const useSupabase = () => {
     restoreAllTasks,
     // Nuevos métodos para mensajes de la tabla 'chibi_messages'
     getRandomMessages,
+    getRandomMessageByEmotion,
     // Cliente directo para casos especiales
     supabase,
     // Método para obtener estadísticas

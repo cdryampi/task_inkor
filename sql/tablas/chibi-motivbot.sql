@@ -91,8 +91,35 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- obetener un mensje aleatorio por estado emocioanl de motivBot
+CREATE OR REPLACE FUNCTION get_random_chibi_messages_by_emotion(emotion VARCHAR(50), limit_count INTEGER DEFAULT 20)
+RETURNS TABLE (
+    id INTEGER,
+    mensaje TEXT,
+    estado VARCHAR(50),
+    tags TEXT[],
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ
+) AS $$
+
+BEGIN
+    RETURN QUERY
+    SELECT cm.id, cm.mensaje, cm.estado, cm.tags, cm.created_at, cm.updated_at
+    FROM chibi_messages cm
+    WHERE cm.estado = emotion
+    ORDER BY RANDOM()
+    LIMIT limit_count;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Otorgar permisos de ejecución a usuarios anónimos
 GRANT EXECUTE ON FUNCTION get_random_chibi_messages(INTEGER) TO anon;
 
 -- También otorgar a usuarios autenticados por si acaso
 GRANT EXECUTE ON FUNCTION get_random_chibi_messages(INTEGER) TO authenticated;
+
+-- Otorgar permisos de ejecución a usuarios anónimos
+GRANT EXECUTE ON FUNCTION get_random_chibi_messages_by_emotion(VARCHAR(50), INTEGER) TO anon;
+
+-- También otorgar a usuarios autenticados por si acaso
+GRANT EXECUTE ON FUNCTION get_random_chibi_messages_by_emotion(VARCHAR(50), INTEGER) TO authenticated;

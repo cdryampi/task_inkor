@@ -1,5 +1,5 @@
 <template>
-  <nav class="bg-white border-b border-gray-200 shadow-sm">
+  <nav class="bg-white border-b border-gray-200 shadow-sm relative">
     <div class="max-w-screen-xl flex items-center justify-between mx-auto px-6 py-4">
       <!-- Logo y título minimalista -->
       <router-link to="/" class="flex items-center space-x-3 group">
@@ -135,7 +135,10 @@ import {
   CheckCircleIcon,
   Cog6ToothIcon,
   Bars3Icon,
-  XMarkIcon
+  XMarkIcon,
+  ClipboardDocumentListIcon,
+  CalendarIcon,
+  ChartBarIcon
 } from '@heroicons/vue/24/outline'
 import { useNewTaskModal } from '@/composables/useNewTaskModal'
 
@@ -303,7 +306,7 @@ const toggleMobileMenu = () => {
     border-top: 1px solid #e5e7eb;
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     padding: 0 1.5rem 1rem;
-    z-index: 50;
+    z-index: 10;
   }
 
   #navbar-menu.hidden {
